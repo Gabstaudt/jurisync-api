@@ -10,4 +10,5 @@ export const pool =
 
 if (!global.__pgPool) global.__pgPool = pool;
 
-export const q = <T = any>(sql: string, params: any[] = []) => pool.query<T>(sql, params);
+// função helper de query (sem genéricos para evitar erro TS)
+export const q = (sql: string, params: any[] = []) => pool.query(sql, params);

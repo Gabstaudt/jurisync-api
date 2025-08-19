@@ -14,15 +14,18 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
+// GET /api/contracts/:id
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   const { rows } = await q("SELECT * FROM contracts WHERE id = $1", [params.id]);
   if (!rows[0]) return NextResponse.json({ error: "não encontrado" }, { status: 404, headers: H });
   return NextResponse.json(rows[0], { headers: H });
 }
 
+// PATCH /api/contracts/:id
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const body = await req.json();
 
+  // mapeia os campos aceitos
   const map: Record<string,string> = {
     name: "name",
     description: "description",
@@ -54,6 +57,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json(rows[0], { headers: H });
 }
 
+// DELETE /api/contracts/:id
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   const r = await q("DELETE FROM contracts WHERE id = $1", [params.id]);
   if (!r.rowCount) return NextResponse.json({ error: "não encontrado" }, { status: 404, headers: H });
