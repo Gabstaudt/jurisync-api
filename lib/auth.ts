@@ -6,6 +6,7 @@ export type UserRole = "admin" | "manager" | "user";
 
 export interface DbUser {
   id: string;
+  ecosystem_id: string;
   name: string;
   email: string;
   password_hash: string;
@@ -21,6 +22,7 @@ export interface DbUser {
 
 export interface PublicUser {
   id: string;
+  ecosystemId: string;
   name: string;
   email: string;
   role: UserRole;
@@ -42,6 +44,7 @@ export const verifyPassword = (password: string, hash: string) =>
 export function sanitizeUser(row: DbUser): PublicUser {
   return {
     id: row.id,
+    ecosystemId: row.ecosystem_id,
     name: row.name,
     email: row.email,
     role: row.role,

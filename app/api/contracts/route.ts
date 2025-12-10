@@ -55,6 +55,13 @@ export async function OPTIONS() {
 
 // GET /api/contracts?status=active&q=Acme&page=1&limit=20&folderId=uuid
 export async function GET(req: Request) {
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") || undefined;
   const search = searchParams.get("q") || undefined;
@@ -90,13 +97,14 @@ export async function GET(req: Request) {
   const sql = `
     SELECT *
     FROM contracts
-    ${whereSQL}
+    WHERE ecosystem_id = $${params.length + 1}
+    ${where.length ? "AND " + where.join(" AND ") : ""}
     ORDER BY updated_at DESC
     LIMIT $${params.length - 1} OFFSET $${params.length};
   `;
 
   try {
-    const { rows } = await q(sql, params);
+    const { rows } = await q(sql, [...params, session.user.ecosystemId]);
     return NextResponse.json((rows as any[]).map(mapRow), { headers: H });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500, headers: H });
@@ -164,8 +172,8 @@ export async function POST(req: Request) {
       }
     });
 
-    cols.push("created_by");
-    vals.push(session.user.id);
+    cols.push("created_by", "ecosystem_id");
+    vals.push(session.user.id, session.user.ecosystemId);
 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(",");
     const { rows } = await q(

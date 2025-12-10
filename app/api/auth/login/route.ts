@@ -52,10 +52,10 @@ export async function POST(req: Request) {
     const session = await createSession(userRow.id);
     await touchLastLogin(userRow.id);
 
-    return NextResponse.json(
-      { token: session.token, user: sanitizeUser(userRow) },
-      { headers: H },
-    );
+    return NextResponse.json({
+      token: session.token,
+      user: sanitizeUser(userRow as any),
+    }, { headers: H });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message || "Erro interno" },

@@ -25,11 +25,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const { searchParams } = new URL(req.url);
-  const onlyActive = searchParams.get("active") === "true";
-  const sql = `SELECT * FROM invite_codes ${onlyActive ? "WHERE is_active = TRUE" : ""} ORDER BY created_at DESC`;
-  const { rows } = await q(sql);
-
+  const { rows } = await q(
+    `SELECT * FROM access_codes WHERE ecosystem_id = $1 ORDER BY created_at DESC`,
+    [session.user.ecosystemId],
+  );
   return NextResponse.json(rows, { headers: H });
 }
 
@@ -44,22 +43,21 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const role = body.role || "user";
-  const email = body.email || null;
-  const department = body.department || null;
   const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
-  const code = (body.code || crypto.randomBytes(4).toString("hex").toUpperCase()).trim();
 
   if (!["admin", "manager", "user"].includes(role)) {
     return NextResponse.json(
-      { error: "Cargo inválido" },
+      { error: "Role inválida" },
       { status: 400, headers: H },
     );
   }
 
+  const code = (body.code || crypto.randomBytes(8).toString("hex")).toUpperCase();
+
   const { rows } = await q(
-    `INSERT INTO invite_codes (code, email, role, department, created_by, expires_at, is_active)
-     VALUES ($1,$2,$3,$4,$5,$6,TRUE) RETURNING *`,
-    [code, email, role, department, session.user.id, expiresAt],
+    `INSERT INTO access_codes (ecosystem_id, code, role, created_by, expires_at, is_active)
+     VALUES ($1,$2,$3,$4,$5,TRUE) RETURNING *`,
+    [session.user.ecosystemId, code, role, session.user.id, expiresAt],
   );
 
   return NextResponse.json(rows[0], { status: 201, headers: H });

@@ -16,6 +16,13 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
   const { rows } = await q(
     "SELECT * FROM contract_comments WHERE contract_id = $1 ORDER BY created_at DESC",
     [params.id],

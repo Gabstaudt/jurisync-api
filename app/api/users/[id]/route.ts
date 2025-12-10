@@ -24,7 +24,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: "Acesso negado" }, { status: 403, headers: H });
   }
 
-  const { rows } = await q("SELECT * FROM users WHERE id = $1", [params.id]);
+  const { rows } = await q(
+    "SELECT * FROM users WHERE id = $1 AND ecosystem_id = $2",
+    [params.id, session.user.ecosystemId],
+  );
   if (!rows[0]) {
     return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404, headers: H });
   }
@@ -64,11 +67,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400, headers: H });
   }
 
-  values.push(params.id);
+  values.push(params.id, session.user.ecosystemId);
   const { rows } = await q(
-    `UPDATE users SET ${fields.join(", ")}, updated_at = NOW() WHERE id = $${
-      values.length
-    } RETURNING *`,
+    `UPDATE users SET ${fields.join(
+      ", ",
+    )}, updated_at = NOW() WHERE id = $${values.length - 1} AND ecosystem_id = $${values.length} RETURNING *`,
     values,
   );
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +16,16 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
   const { rows } = await q(
-    `SELECT * FROM contracts WHERE folder_id = $1 ORDER BY updated_at DESC`,
-    [params.id],
+    `SELECT * FROM contracts WHERE folder_id = $1 AND ecosystem_id = $2 ORDER BY updated_at DESC`,
+    [params.id, session.user.ecosystemId],
   );
 
   const now = new Date();

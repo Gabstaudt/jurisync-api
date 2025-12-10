@@ -35,13 +35,13 @@ const SYSTEM_FOLDERS = [
   },
 ];
 
-async function ensureSystemFolders(userId?: string) {
+async function ensureSystemFolders(userId: string | undefined, ecosystemId: string) {
   for (const folder of SYSTEM_FOLDERS) {
     await q(
-      `INSERT INTO folders (name, description, color, icon, type, permissions, created_by)
-       SELECT $1,$2,$3,$4,$5,$6,$7
+      `INSERT INTO folders (name, description, color, icon, type, permissions, ecosystem_id, created_by)
+       SELECT $1,$2,$3,$4,$5,$6,$7,$8
        WHERE NOT EXISTS (
-         SELECT 1 FROM folders WHERE name = $1 AND type = $5
+         SELECT 1 FROM folders WHERE name = $1 AND type = $5 AND ecosystem_id = $7
        )`,
       [
         folder.name,
@@ -50,6 +50,7 @@ async function ensureSystemFolders(userId?: string) {
         folder.icon,
         folder.type,
         '{"isPublic":true,"canView":[],"canEdit":[],"canManage":[]}',
+        ecosystemId,
         userId || null,
       ],
     );
@@ -62,13 +63,21 @@ export async function OPTIONS() {
 
 export async function GET(req: Request) {
   const session = await requireAuth(req);
-  await ensureSystemFolders(session?.user.id);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
+  await ensureSystemFolders(session.user.id, session.user.ecosystemId);
 
   const { rows } = await q(
     `SELECT f.*, 
       (SELECT COUNT(*) FROM contracts c WHERE c.folder_id = f.id) AS contract_count_calc
      FROM folders f
+     WHERE f.ecosystem_id = $1
      ORDER BY created_at DESC`,
+    [session.user.ecosystemId],
   );
 
   const data = rows.map((r: any) => ({
@@ -113,8 +122,8 @@ export async function POST(req: Request) {
   let path: string[] = [];
   if (parentId) {
     const { rows: parents } = await q(
-      "SELECT id, path FROM folders WHERE id = $1",
-      [parentId],
+      "SELECT id, path FROM folders WHERE id = $1 AND ecosystem_id = $2",
+      [parentId, session.user.ecosystemId],
     );
     if (!parents[0]) {
       return NextResponse.json(
@@ -131,8 +140,8 @@ export async function POST(req: Request) {
 
   const { rows } = await q(
     `INSERT INTO folders
-      (name, description, color, icon, parent_id, path, type, permissions, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      (name, description, color, icon, parent_id, path, type, permissions, ecosystem_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      RETURNING *`,
     [
       name,
@@ -143,6 +152,7 @@ export async function POST(req: Request) {
       path,
       body.type || "custom",
       permissions,
+      session.user.ecosystemId,
       session.user.id,
     ],
   );

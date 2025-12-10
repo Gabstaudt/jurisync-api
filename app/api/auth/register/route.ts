@@ -21,72 +21,104 @@ export async function POST(req: Request) {
     const name = (body.name || "").trim();
     const email = (body.email || "").toLowerCase().trim();
     const password = body.password || "";
-    const inviteCode = (body.inviteCode || "").trim();
+    const role = body.role || "user";
+    const accessCode = (body.inviteCode || body.accessCode || "").trim();
     const department = body.department || null;
     const phone = body.phone || null;
+    const ecosystemName = body.ecosystemName || "Ecosystem 1";
+    const isFirstAdmin = Boolean(body.isFirstAdmin);
 
-    if (!name || !email || !password || !inviteCode) {
+    if (!name || !email || !password || !role) {
       return NextResponse.json(
-        { error: "Nome, e-mail, senha e código de convite são obrigatórios" },
+        { error: "Nome, e-mail, senha e role são obrigatórios" },
+        { status: 400, headers: H },
+      );
+    }
+    if (!["admin", "manager", "user"].includes(role)) {
+      return NextResponse.json(
+        { error: "Role inválida" },
         { status: 400, headers: H },
       );
     }
 
-    const { rows: inviteRows } = await q(
-      "SELECT * FROM invite_codes WHERE code = $1 AND is_active = TRUE",
-      [inviteCode],
+    const { rows: countRows } = await q(
+      "SELECT COUNT(*)::int AS count FROM users",
     );
-    const invite = inviteRows[0] as any;
-    if (!invite) {
-      return NextResponse.json(
-        { error: "Código de convite inválido" },
-        { status: 400, headers: H },
+    const userCount = Number(countRows[0]?.count || 0);
+
+    let ecosystemId: string | null = null;
+
+    // Primeiro admin sem código: se flag presente OU não houver usuários
+    if (role === "admin" && (isFirstAdmin || (userCount === 0 && !accessCode))) {
+      const { rows: ecoRows } = await q(
+        "INSERT INTO ecosystems (name) VALUES ($1) RETURNING id",
+        [ecosystemName],
       );
-    }
-    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Código de convite expirado" },
-        { status: 400, headers: H },
+      ecosystemId = ecoRows[0].id;
+    } else {
+      if (!accessCode) {
+        return NextResponse.json(
+          { error: "Código de acesso é obrigatório" },
+          { status: 400, headers: H },
+        );
+      }
+      const { rows: codeRows } = await q(
+        `SELECT * FROM access_codes WHERE code = $1 AND is_active = TRUE`,
+        [accessCode],
       );
-    }
-    if (invite.email && invite.email.toLowerCase() !== email) {
-      return NextResponse.json(
-        { error: "Este código está vinculado a outro e-mail" },
-        { status: 400, headers: H },
+      const code = codeRows[0] as any;
+      if (!code) {
+        return NextResponse.json(
+          { error: "Código de acesso inválido" },
+          { status: 400, headers: H },
+        );
+      }
+      if (code.role !== role) {
+        return NextResponse.json(
+          { error: "Código não corresponde ao tipo selecionado" },
+          { status: 400, headers: H },
+        );
+      }
+      if (code.expires_at && new Date(code.expires_at) < new Date()) {
+        return NextResponse.json(
+          { error: "Código expirado" },
+          { status: 400, headers: H },
+        );
+      }
+      ecosystemId = code.ecosystem_id;
+      await q(
+        "UPDATE access_codes SET used_at = NOW(), used_by = $1, is_active = FALSE WHERE id = $2",
+        [null, code.id],
       );
     }
 
     const { rows: existing } = await q(
-      "SELECT id FROM users WHERE email = $1",
-      [email],
+      "SELECT id FROM users WHERE email = $1 AND ecosystem_id = $2",
+      [email, ecosystemId],
     );
     if (existing[0]) {
       return NextResponse.json(
-        { error: "E-mail já cadastrado" },
+        { error: "E-mail já cadastrado neste ecossistema" },
         { status: 409, headers: H },
       );
     }
 
     const passwordHash = await hashPassword(password);
     const { rows: created } = await q(
-      `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [
         name,
         email,
         passwordHash,
-        invite.role || "user",
-        department ?? invite.department ?? null,
+        role,
+        department,
         phone,
-        inviteCode,
+        accessCode || null,
+        ecosystemId,
       ],
     );
     const userRow = created[0] as any;
-
-    await q(
-      "UPDATE invite_codes SET used_at = NOW(), used_by = $1, is_active = FALSE WHERE id = $2",
-      [userRow.id, invite.id],
-    );
 
     const session = await createSession(userRow.id);
 

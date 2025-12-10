@@ -24,7 +24,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const { rows } = await q("SELECT * FROM users ORDER BY created_at DESC");
+  const { rows } = await q(
+    "SELECT * FROM users WHERE ecosystem_id = $1 ORDER BY created_at DESC",
+    [session.user.ecosystemId],
+  );
   return NextResponse.json(
     rows.map((r) => sanitizeUser(r as any)),
     { headers: H },
@@ -63,9 +66,18 @@ export async function POST(req: Request) {
 
   const passwordHash = await hashPassword(password);
   const { rows } = await q(
-    `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [name, email, passwordHash, role, department, phone, body.inviteCode || null],
+    `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [
+      name,
+      email,
+      passwordHash,
+      role,
+      department,
+      phone,
+      body.inviteCode || null,
+      session.user.ecosystemId,
+    ],
   );
 
   return NextResponse.json(sanitizeUser(rows[0] as any), {

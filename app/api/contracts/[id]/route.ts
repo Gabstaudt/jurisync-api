@@ -42,9 +42,18 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const { rows } = await q("SELECT * FROM contracts WHERE id = $1", [
-    params.id,
-  ]);
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
+
+  const { rows } = await q(
+    "SELECT * FROM contracts WHERE id = $1 AND ecosystem_id = $2",
+    [params.id, session.user.ecosystemId],
+  );
   if (!rows[0]) {
     return NextResponse.json(
       { error: "Contrato não encontrado" },
@@ -102,11 +111,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     );
   }
 
-  values.push(params.id);
+  values.push(params.id, session.user.ecosystemId);
   const { rows } = await q(
-    `UPDATE contracts SET ${fields.join(", ")}, updated_at = NOW() WHERE id = $${
-      values.length
-    } RETURNING *`,
+    `UPDATE contracts SET ${fields.join(
+      ", ",
+    )}, updated_at = NOW() WHERE id = $${values.length - 1} AND ecosystem_id = $${values.length} RETURNING *`,
     values,
   );
 

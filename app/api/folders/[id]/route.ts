@@ -16,11 +16,18 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
   const { rows } = await q(
     `SELECT f.*, 
       (SELECT COUNT(*) FROM contracts c WHERE c.folder_id = f.id) AS contract_count_calc
-     FROM folders f WHERE f.id = $1`,
-    [params.id],
+     FROM folders f WHERE f.id = $1 AND f.ecosystem_id = $2`,
+    [params.id, session.user.ecosystemId],
   );
   const f = rows[0] as any;
   if (!f) {
@@ -52,7 +59,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!session || !["admin", "manager"].includes(session.user.role)) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403, headers: H });
   }
-
   const body = await req.json().catch(() => ({}));
   const fields: string[] = [];
   const values: any[] = [];
@@ -79,11 +85,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400, headers: H });
   }
 
-  values.push(params.id);
+  values.push(params.id, session.user.ecosystemId);
   const { rows } = await q(
-    `UPDATE folders SET ${fields.join(", ")}, updated_at = NOW() WHERE id = $${
-      values.length
-    } RETURNING *`,
+    `UPDATE folders SET ${fields.join(
+      ", ",
+    )}, updated_at = NOW() WHERE id = $${values.length - 1} AND ecosystem_id = $${values.length} RETURNING *`,
     values,
   );
   const f = rows[0] as any;
