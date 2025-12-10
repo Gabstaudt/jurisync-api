@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const parentId = body.parentId || null;
+  const parentId = body.parentId === "" ? null : body.parentId || null;
   let path: string[] = [];
   if (parentId) {
     const { rows: parents } = await q(

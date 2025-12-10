@@ -123,6 +123,9 @@ export async function POST(req: Request) {
     }
 
     const data = await req.json().catch(() => ({}));
+    // Normaliza campos opcionais que podem vir como string vazia
+    if (data.folderId === "") data.folderId = null;
+    if (data.ownerId === "") data.ownerId = null;
 
     for (const k of [
       "name",
@@ -166,7 +169,7 @@ export async function POST(req: Request) {
     };
 
     Object.entries(map).forEach(([k, col]) => {
-      if (data[k] !== undefined && data[k] !== null) {
+      if (data[k] !== undefined && data[k] !== null && data[k] !== "") {
         cols.push(col);
         vals.push(data[k]);
       }
