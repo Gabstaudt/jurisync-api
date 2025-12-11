@@ -126,6 +126,59 @@ export async function POST(req: Request) {
     // Normaliza campos opcionais que podem vir como string vazia
     if (data.folderId === "") data.folderId = null;
     if (data.ownerId === "") data.ownerId = null;
+    const parsedAttachments = (() => {
+      if (data.attachments === "" || data.attachments === null) return [];
+      if (typeof data.attachments === "string") {
+        try {
+          return JSON.parse(data.attachments);
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(data.attachments)) return data.attachments;
+      return [];
+    })();
+    const parsedNotifications = (() => {
+      if (data.notifications === "" || data.notifications === null) return [];
+      if (typeof data.notifications === "string") {
+        try {
+          return JSON.parse(data.notifications);
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(data.notifications)) return data.notifications;
+      return [];
+    })();
+    const parsedPermissions = (() => {
+      if (data.permissions === "" || data.permissions === null) return null;
+      if (typeof data.permissions === "string") {
+        try {
+          return JSON.parse(data.permissions);
+        } catch {
+          return null;
+        }
+      }
+      if (typeof data.permissions === "object") return data.permissions;
+      return null;
+    })();
+    const parsedTags = (() => {
+      if (data.tags === "" || data.tags === null) return [];
+      if (Array.isArray(data.tags)) return data.tags;
+      return [];
+    })();
+
+    data.attachments = parsedAttachments;
+    data.notifications = parsedNotifications;
+    data.permissions =
+      parsedPermissions ||
+      {
+        isPublic: true,
+        canView: [],
+        canEdit: [],
+        canComment: [],
+      };
+    data.tags = parsedTags;
 
     for (const k of [
       "name",
@@ -170,8 +223,13 @@ export async function POST(req: Request) {
 
     Object.entries(map).forEach(([k, col]) => {
       if (data[k] !== undefined && data[k] !== null && data[k] !== "") {
+        let val = data[k];
+        // Garantir JSON válido para colunas jsonb
+        if (["attachments", "notifications", "permissions"].includes(k)) {
+          val = JSON.stringify(val);
+        }
         cols.push(col);
-        vals.push(data[k]);
+        vals.push(val);
       }
     });
 
