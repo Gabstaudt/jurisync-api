@@ -1,13 +1,6 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0b1220;
+  --foreground: #e2e8f0;
 }
 
 html,
@@ -18,8 +11,10 @@ body {
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(circle at 20% 20%, rgba(34, 197, 94, 0.12), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(56, 189, 248, 0.18), transparent 22%),
+    #0b1220;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -35,8 +30,12 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
 }
