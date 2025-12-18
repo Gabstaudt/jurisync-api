@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,6 +146,35 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       "UPDATE chat_participants SET last_read_at = NOW() WHERE conversation_id = $1 AND user_id = $2",
       [params.id, session.user.id],
     );
+
+    // Notificar outros participantes do chat
+    try {
+      const { rows: recipients } = await q(
+        `SELECT u.id, u.name
+         FROM chat_participants cp
+         JOIN users u ON u.id = cp.user_id
+         WHERE cp.conversation_id = $1 AND cp.user_id <> $2`,
+        [params.id, session.user.id],
+      );
+      const senderName = session.user.name || "Usuario";
+      const title = "Nova mensagem no chat";
+      const msg = `${senderName} enviou uma mensagem`;
+      const actionUrl = `/chat?conversation=${params.id}`;
+      await Promise.all(
+        recipients.map((r: any) =>
+          createNotification({
+            userId: r.id,
+            ecosystemId: session.user.ecosystemId,
+            title,
+            message: msg,
+            type: "info",
+            actionUrl,
+          }),
+        ),
+      );
+    } catch {
+      // silencioso para não bloquear envio
+    }
 
     return NextResponse.json(
       {

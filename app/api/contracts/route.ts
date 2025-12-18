@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -242,7 +243,34 @@ export async function POST(req: Request) {
       vals,
     );
 
-    return NextResponse.json(mapRow(rows[0]), { status: 201, headers: H });
+    const created = rows[0];
+
+    // Notificar usuarios do ecossistema (exceto criador)
+    try {
+      const { rows: users } = await q(
+        "SELECT id, name FROM users WHERE ecosystem_id = $1 AND id <> $2",
+        [session.user.ecosystemId, session.user.id],
+      );
+      const title = "Novo contrato adicionado";
+      const message = `${session.user.name} adicionou o contrato "${created.name}"`;
+      const actionUrl = `/contracts/${created.id}`;
+      await Promise.all(
+        users.map((u: any) =>
+          createNotification({
+            userId: u.id,
+            ecosystemId: session.user.ecosystemId,
+            title,
+            message,
+            type: "info",
+            actionUrl,
+          }),
+        ),
+      );
+    } catch {
+      // silencioso para não quebrar criação de contrato
+    }
+
+    return NextResponse.json(mapRow(created), { status: 201, headers: H });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 400, headers: H });
   }
