@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,52 +12,105 @@ const H = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+const mapRow = (r: any) => {
+  const now = new Date();
+  const endDate = new Date(r.end_date);
+  const daysUntil = Math.ceil(
+    (endDate.getTime() - now.getTime()) / (1000 * 3600 * 24),
+  );
+  const status =
+    r.status === "active" && daysUntil <= 7 && daysUntil >= 0
+      ? "expiring_soon"
+      : r.status;
+
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    contractingCompany: r.contracting_company,
+    contractedParty: r.contracted_party,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    value: Number(r.value),
+    currency: r.currency,
+    internalResponsible: r.internal_responsible,
+    responsibleEmail: r.responsible_email,
+    status,
+    priority: r.priority,
+    tags: r.tags || [],
+    folderId: r.folder_id,
+    permissions: r.permissions,
+    attachments: r.attachments,
+    notifications: r.notifications,
+    isArchived: r.is_archived,
+    ownerId: r.owner_id,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    responsibleIds: r.responsible_ids || [],
+  };
+};
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-// GET /api/contracts?status=active&q=Acme&page=1&limit=20
+// GET /api/contracts?status=active&q=Acme&page=1&limit=20&folderId=uuid
 export async function GET(req: Request) {
+  const session = await requireAuth(req);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
+  }
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") || undefined;
   const search = searchParams.get("q") || undefined;
+  const folderId = searchParams.get("folderId") || undefined;
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(searchParams.get("limit") || "20", 10)),
+  );
   const offset = (page - 1) * limit;
 
   const params: any[] = [];
   const where: string[] = [];
 
-  if (status) { params.push(status); where.push(`status = $${params.length}`); }
+  if (status) {
+    params.push(status);
+    where.push(`status = $${params.length}`);
+  }
+  if (folderId) {
+    params.push(folderId);
+    where.push(`folder_id = $${params.length}`);
+  }
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(name ILIKE $${params.length} OR contracting_company ILIKE $${params.length} OR contracted_party ILIKE $${params.length})`);
+    where.push(
+      `(name ILIKE $${params.length} OR contracting_company ILIKE $${params.length} OR contracted_party ILIKE $${params.length})`,
+    );
   }
 
   const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
   params.push(limit, offset);
 
-  // calculo 'expiring_soon' para a UI quando faltar <= 7 dias
   const sql = `
-    SELECT
-      id, name, description, contracting_company, contracted_party,
-      start_date, end_date, value, currency, internal_responsible,
-      responsible_email, status, priority, folder_id, owner_id, created_by,
-      created_at, updated_at,
-      CASE
-        WHEN status = 'active' AND end_date <= (CURRENT_DATE + INTERVAL '7 days')
-        THEN 'expiring_soon' ELSE status::text
-      END AS ui_status
-    FROM contracts
-    ${whereSQL}
-    ORDER BY updated_at DESC
-    LIMIT $${params.length-1} OFFSET $${params.length};
+    SELECT c.*, COALESCE(
+      (SELECT ARRAY_AGG(cr.user_id) FROM contract_responsibles cr WHERE cr.contract_id = c.id),
+      '{}'::uuid[]
+    ) AS responsible_ids
+    FROM contracts c
+    WHERE c.ecosystem_id = $${params.length + 1}
+    ${where.length ? "AND " + where.join(" AND ") : ""}
+    ORDER BY c.updated_at DESC
+    LIMIT $${params.length - 1} OFFSET $${params.length};
   `;
 
   try {
-    const { rows } = await q(sql, params);
-    for (const r of rows as any[]) if (r.ui_status) r.status = r.ui_status;
-    return NextResponse.json(rows, { headers: H });
+    const { rows } = await q(sql, [...params, session.user.ecosystemId]);
+    return NextResponse.json((rows as any[]).map(mapRow), { headers: H });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500, headers: H });
   }
@@ -64,15 +119,92 @@ export async function GET(req: Request) {
 // POST /api/contracts
 export async function POST(req: Request) {
   try {
-    const data = await req.json();
-
-    // obrigatórios mínimos (igual o front usa)
-    for (const k of ["name", "contractingCompany", "contractedParty", "internalResponsible", "responsibleEmail"]) {
-      if (!data?.[k]) return NextResponse.json({ error: `campo obrigatório: ${k}` }, { status: 400, headers: H });
+    const session = await requireAuth(req);
+    if (!session) {
+      return NextResponse.json(
+        { error: "Não autenticado" },
+        { status: 401, headers: H },
+      );
     }
 
-    // camelCase (front) -> snake_case (DB)
-    const map: Record<string,string> = {
+    const data = await req.json().catch(() => ({}));
+    // Normaliza campos opcionais que podem vir como string vazia
+    if (data.folderId === "") data.folderId = null;
+    if (data.ownerId === "") data.ownerId = null;
+    const parsedAttachments = (() => {
+      if (data.attachments === "" || data.attachments === null) return [];
+      if (typeof data.attachments === "string") {
+        try {
+          return JSON.parse(data.attachments);
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(data.attachments)) return data.attachments;
+      return [];
+    })();
+    const parsedNotifications = (() => {
+      if (data.notifications === "" || data.notifications === null) return [];
+      if (typeof data.notifications === "string") {
+        try {
+          return JSON.parse(data.notifications);
+        } catch {
+          return [];
+        }
+      }
+      if (Array.isArray(data.notifications)) return data.notifications;
+      return [];
+    })();
+    const parsedPermissions = (() => {
+      if (data.permissions === "" || data.permissions === null) return null;
+      if (typeof data.permissions === "string") {
+        try {
+          return JSON.parse(data.permissions);
+        } catch {
+          return null;
+        }
+      }
+      if (typeof data.permissions === "object") return data.permissions;
+      return null;
+    })();
+    const parsedTags = (() => {
+      if (data.tags === "" || data.tags === null) return [];
+      if (Array.isArray(data.tags)) return data.tags;
+      return [];
+    })();
+
+    data.attachments = parsedAttachments;
+    data.notifications = parsedNotifications;
+    data.permissions =
+      parsedPermissions ||
+      {
+        isPublic: true,
+        canView: [],
+        canEdit: [],
+        canComment: [],
+      };
+    data.tags = parsedTags;
+
+    for (const k of [
+      "name",
+      "contractingCompany",
+      "contractedParty",
+      "internalResponsible",
+      "responsibleEmail",
+      "startDate",
+      "endDate",
+    ]) {
+      if (!data?.[k]) {
+        return NextResponse.json(
+          { error: `campo obrigatório: ${k}` },
+          { status: 400, headers: H },
+        );
+      }
+    }
+
+    const cols: string[] = [];
+    const vals: any[] = [];
+    const map: Record<string, string> = {
       name: "name",
       description: "description",
       contractingCompany: "contracting_company",
@@ -85,27 +217,75 @@ export async function POST(req: Request) {
       responsibleEmail: "responsible_email",
       status: "status",
       priority: "priority",
+      tags: "tags",
       folderId: "folder_id",
+      permissions: "permissions",
+      attachments: "attachments",
+      notifications: "notifications",
+      isArchived: "is_archived",
       ownerId: "owner_id",
-      createdBy: "created_by"
     };
 
-    const cols: string[] = [];
-    const vals: any[] = [];
     Object.entries(map).forEach(([k, col]) => {
-      if (data[k] !== undefined && data[k] !== null) {
-        cols.push(col); vals.push(data[k]);
+      if (data[k] !== undefined && data[k] !== null && data[k] !== "") {
+        let val = data[k];
+        // Garantir JSON válido para colunas jsonb
+        if (["attachments", "notifications", "permissions"].includes(k)) {
+          val = JSON.stringify(val);
+        }
+        cols.push(col);
+        vals.push(val);
       }
     });
-    if (!cols.length) return NextResponse.json({ error: "sem dados" }, { status: 400, headers: H });
+
+    cols.push("created_by", "ecosystem_id");
+    vals.push(session.user.id, session.user.ecosystemId);
 
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(",");
     const { rows } = await q(
       `INSERT INTO contracts (${cols.join(",")}) VALUES (${placeholders}) RETURNING *`,
-      vals
+      vals,
     );
 
-    return NextResponse.json(rows[0], { status: 201, headers: H });
+    const created = rows[0];
+
+    // Responsáveis adicionais
+    const responsibleIds: string[] = Array.isArray(data.responsibleIds) ? data.responsibleIds : [];
+    const uniqueResponsibles = Array.from(new Set(responsibleIds.filter(Boolean)));
+    for (const uid of uniqueResponsibles) {
+      await q(
+        `INSERT INTO contract_responsibles (contract_id, user_id)
+         VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+        [created.id, uid],
+      );
+    }
+
+    // Notificar usuarios do ecossistema (exceto criador)
+    try {
+      const { rows: users } = await q(
+        "SELECT id, name FROM users WHERE ecosystem_id = $1 AND id <> $2",
+        [session.user.ecosystemId, session.user.id],
+      );
+      const title = "Novo contrato adicionado";
+      const message = `${session.user.name} adicionou o contrato "${created.name}"`;
+      const actionUrl = `/contracts/${created.id}`;
+      await Promise.all(
+        users.map((u: any) =>
+          createNotification({
+            userId: u.id,
+            ecosystemId: session.user.ecosystemId,
+            title,
+            message,
+            type: "info",
+            actionUrl,
+          }),
+        ),
+      );
+    } catch {
+      // silencioso para não quebrar criação de contrato
+    }
+
+    return NextResponse.json(mapRow(created), { status: 201, headers: H });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 400, headers: H });
   }
