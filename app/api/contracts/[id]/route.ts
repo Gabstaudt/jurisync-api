@@ -35,7 +35,6 @@ const mapRow = (r: any) => ({
   createdBy: r.created_by,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
-  responsibleIds: r.responsible_ids || [],
 });
 
 export async function OPTIONS() {
@@ -45,52 +44,33 @@ export async function OPTIONS() {
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await requireAuth(req);
   if (!session) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
   }
 
-  // Primeiro tenta no ecossistema do usuário
-  let rows = (
-    await q(
-      `SELECT c.*, COALESCE(
-        (SELECT ARRAY_AGG(cr.user_id) FROM contract_responsibles cr WHERE cr.contract_id = c.id),
-        '{}'::uuid[]
-      ) AS responsible_ids
-       FROM contracts c
-       WHERE c.id = $1 AND c.ecosystem_id = $2`,
-      [params.id, session.user.ecosystemId],
-    )
-  ).rows;
-
-  // Se não encontrou e o usuário é admin, busca globalmente
-  if (!rows[0] && session.user.role === "admin") {
-    rows = (
-      await q(
-        `SELECT c.*, COALESCE(
-          (SELECT ARRAY_AGG(cr.user_id) FROM contract_responsibles cr WHERE cr.contract_id = c.id),
-          '{}'::uuid[]
-        ) AS responsible_ids
-         FROM contracts c
-         WHERE c.id = $1`,
-        [params.id],
-      )
-    ).rows;
-  }
-
+  const { rows } = await q(
+    "SELECT * FROM contracts WHERE id = $1 AND ecosystem_id = $2",
+    [params.id, session.user.ecosystemId],
+  );
   if (!rows[0]) {
-    return NextResponse.json({ error: "Contrato nao encontrado" }, { status: 404, headers: H });
+    return NextResponse.json(
+      { error: "Contrato não encontrado" },
+      { status: 404, headers: H },
+    );
   }
-
   return NextResponse.json(mapRow(rows[0]), { headers: H });
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await requireAuth(req);
   if (!session) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+    return NextResponse.json(
+      { error: "Não autenticado" },
+      { status: 401, headers: H },
+    );
   }
-
-  // Admin pode atualizar qualquer contrato; demais somente dentro do ecossistema
-  const ecosystemScope = session.user.role === "admin" ? null : session.user.ecosystemId;
 
   const body = await req.json().catch(() => ({}));
   const fields: string[] = [];
@@ -125,45 +105,26 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   });
 
   if (!fields.length) {
-    return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400, headers: H });
+    return NextResponse.json(
+      { error: "Nenhum campo para atualizar" },
+      { status: 400, headers: H },
+    );
   }
 
-  values.push(params.id);
-  let sql = `UPDATE contracts SET ${fields.join(", ")}, updated_at = NOW() WHERE id = $${values.length}`;
-  if (ecosystemScope) {
-    values.push(ecosystemScope);
-    sql += ` AND ecosystem_id = $${values.length}`;
-  }
-  sql += " RETURNING *";
+  values.push(params.id, session.user.ecosystemId);
+  const { rows } = await q(
+    `UPDATE contracts SET ${fields.join(
+      ", ",
+    )}, updated_at = NOW() WHERE id = $${values.length - 1} AND ecosystem_id = $${values.length} RETURNING *`,
+    values,
+  );
 
-  const { rows } = await q(sql, values);
   if (!rows[0]) {
-    return NextResponse.json({ error: "Contrato nao encontrado" }, { status: 404, headers: H });
+    return NextResponse.json(
+      { error: "Contrato não encontrado" },
+      { status: 404, headers: H },
+    );
   }
 
-  // Atualiza responsáveis se enviados
-  if (Array.isArray(body.responsibleIds)) {
-    await q("DELETE FROM contract_responsibles WHERE contract_id = $1", [params.id]);
-    const uniqueIds = Array.from(new Set(body.responsibleIds.filter(Boolean)));
-    for (const uid of uniqueIds) {
-      await q(
-        `INSERT INTO contract_responsibles (contract_id, user_id)
-         VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-        [params.id, uid],
-      );
-    }
-  }
-
-  const refreshed = (
-    await q(
-      `SELECT c.*, COALESCE(
-        (SELECT ARRAY_AGG(cr.user_id) FROM contract_responsibles cr WHERE cr.contract_id = c.id),
-        '{}'::uuid[]
-      ) AS responsible_ids
-       FROM contracts c WHERE c.id = $1`,
-      [params.id],
-    )
-  ).rows[0];
-
-  return NextResponse.json(mapRow(refreshed), { headers: H });
+  return NextResponse.json(mapRow(rows[0]), { headers: H });
 }

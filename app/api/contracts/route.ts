@@ -47,7 +47,6 @@ const mapRow = (r: any) => {
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    responsibleIds: r.responsible_ids || [],
   };
 };
 
@@ -97,14 +96,11 @@ export async function GET(req: Request) {
   params.push(limit, offset);
 
   const sql = `
-    SELECT c.*, COALESCE(
-      (SELECT ARRAY_AGG(cr.user_id) FROM contract_responsibles cr WHERE cr.contract_id = c.id),
-      '{}'::uuid[]
-    ) AS responsible_ids
-    FROM contracts c
-    WHERE c.ecosystem_id = $${params.length + 1}
+    SELECT *
+    FROM contracts
+    WHERE ecosystem_id = $${params.length + 1}
     ${where.length ? "AND " + where.join(" AND ") : ""}
-    ORDER BY c.updated_at DESC
+    ORDER BY updated_at DESC
     LIMIT $${params.length - 1} OFFSET $${params.length};
   `;
 
@@ -248,17 +244,6 @@ export async function POST(req: Request) {
     );
 
     const created = rows[0];
-
-    // Responsáveis adicionais
-    const responsibleIds: string[] = Array.isArray(data.responsibleIds) ? data.responsibleIds : [];
-    const uniqueResponsibles = Array.from(new Set(responsibleIds.filter(Boolean)));
-    for (const uid of uniqueResponsibles) {
-      await q(
-        `INSERT INTO contract_responsibles (contract_id, user_id)
-         VALUES ($1,$2) ON CONFLICT DO NOTHING`,
-        [created.id, uid],
-      );
-    }
 
     // Notificar usuarios do ecossistema (exceto criador)
     try {
