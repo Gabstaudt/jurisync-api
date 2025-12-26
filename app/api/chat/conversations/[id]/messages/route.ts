@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
@@ -44,7 +44,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await requireAuth(req);
     if (!session) {
@@ -99,7 +99,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await requireAuth(req);
     if (!session) {
