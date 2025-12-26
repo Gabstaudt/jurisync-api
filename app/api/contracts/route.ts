@@ -12,6 +12,31 @@ const H = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+const parsePermissions = (value: any) => {
+  if (!value || value === "") return { isPublic: true, canView: [], canEdit: [], canComment: [] };
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return { isPublic: true, canView: [], canEdit: [], canComment: [] };
+    }
+  }
+  if (typeof value === "object") return value;
+  return { isPublic: true, canView: [], canEdit: [], canComment: [] };
+};
+
+const ensureSelfAccess = (permissions: any, userId: string, ownerId?: string | null) => {
+  const ids = [userId, ownerId].filter(Boolean) as string[];
+  const dedupe = (arr?: string[]) => Array.from(new Set([...(arr || []), ...ids]));
+  const parsed = parsePermissions(permissions);
+  return {
+    isPublic: parsed.isPublic ?? true,
+    canView: dedupe(parsed.canView),
+    canEdit: dedupe(parsed.canEdit),
+    canComment: dedupe(parsed.canComment),
+  };
+};
+
 const mapRow = (r: any) => {
   const now = new Date();
   const endDate = new Date(r.end_date);
@@ -39,7 +64,7 @@ const mapRow = (r: any) => {
     priority: r.priority,
     tags: r.tags || [],
     folderId: r.folder_id,
-    permissions: r.permissions,
+    permissions: parsePermissions(r.permissions),
     attachments: r.attachments,
     notifications: r.notifications,
     isArchived: r.is_archived,
@@ -171,14 +196,16 @@ export async function POST(req: Request) {
 
     data.attachments = parsedAttachments;
     data.notifications = parsedNotifications;
-    data.permissions =
-      parsedPermissions ||
-      {
+    data.permissions = ensureSelfAccess(
+      parsedPermissions || {
         isPublic: true,
         canView: [],
         canEdit: [],
         canComment: [],
-      };
+      },
+      session.user.id,
+      data.ownerId || session.user.id,
+    );
     data.tags = parsedTags;
 
     for (const k of [
