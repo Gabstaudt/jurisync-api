@@ -149,7 +149,6 @@ export async function POST(req: NextRequest, context: any) {
         message.created_at,
         content ? content.slice(0, 140) : "Arquivo enviado",
         conversationId,
-        conversationId,
       ],
     );
 

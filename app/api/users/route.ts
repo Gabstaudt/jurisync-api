@@ -17,10 +17,10 @@ export async function OPTIONS() {
 
 export async function GET(req: Request) {
   const session = await requireAuth(req);
-  if (!session || session.user.role !== "admin") {
+  if (!session) {
     return NextResponse.json(
-      { error: "Acesso negado" },
-      { status: 403, headers: H },
+      { error: "Nao autenticado" },
+      { status: 401, headers: H },
     );
   }
 
@@ -28,10 +28,8 @@ export async function GET(req: Request) {
     "SELECT * FROM users WHERE ecosystem_id = $1 ORDER BY created_at DESC",
     [session.user.ecosystemId],
   );
-  return NextResponse.json(
-    rows.map((r) => sanitizeUser(r as any)),
-    { headers: H },
-  );
+
+  return NextResponse.json(rows.map((r) => sanitizeUser(r as any)), { headers: H });
 }
 
 export async function POST(req: Request) {
