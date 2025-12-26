@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
@@ -102,7 +102,14 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json(
+      { error: "Contrato nao encontrado" },
+      { status: 404, headers: H },
+    );
+  }
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json(
@@ -146,7 +153,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json(mapRow({ ...contract, permissions }), { headers: H });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json(
+      { error: "Contrato nao encontrado" },
+      { status: 404, headers: H },
+    );
+  }
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json(
@@ -248,3 +262,5 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   return NextResponse.json(mapRow(updated), { headers: H });
 }
+
+

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
-import { requireAuth, sanitizeUser } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,39 +15,60 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const session = await requireAuth(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401, headers: H });
+export async function GET(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
-  if (session.user.role !== "admin" && session.user.id !== params.id) {
+  const session = await requireAuth(req);
+  if (!session || (session.user.role !== "admin" && session.user.id !== params.id)) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403, headers: H });
   }
 
-  const { rows } = await q(
-    "SELECT * FROM users WHERE id = $1 AND ecosystem_id = $2",
-    [params.id, session.user.ecosystemId],
-  );
-  if (!rows[0]) {
-    return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404, headers: H });
+  const { rows } = await q("SELECT * FROM users WHERE id = $1", [params.id]);
+  const u = rows[0];
+  if (!u) {
+    return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
-  return NextResponse.json(sanitizeUser(rows[0] as any), { headers: H });
+
+  return NextResponse.json(
+    {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      department: u.department,
+      phone: u.phone,
+      inviteCode: u.invite_code,
+      isActive: u.is_active,
+      lastLoginAt: u.last_login_at,
+      createdAt: u.created_at,
+      updatedAt: u.updated_at,
+    },
+    { headers: H },
+  );
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const session = await requireAuth(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401, headers: H });
+export async function PATCH(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
-  if (session.user.role !== "admin" && session.user.id !== params.id) {
+  const session = await requireAuth(req);
+  if (!session || (session.user.role !== "admin" && session.user.id !== params.id)) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403, headers: H });
   }
 
   const body = await req.json().catch(() => ({}));
+
+  if (session.user.role !== "admin") {
+    delete body.role;
+    delete body.isActive;
+  }
+
   const fields: string[] = [];
   const values: any[] = [];
-
-  const allowed: Record<string, string> = {
+  const map: Record<string, string> = {
     name: "name",
     email: "email",
     role: "role",
@@ -55,29 +76,40 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     phone: "phone",
     isActive: "is_active",
   };
-
-  Object.entries(allowed).forEach(([key, column]) => {
-    if (body[key] !== undefined) {
-      fields.push(`${column} = $${fields.length + 1}`);
-      values.push(column === "email" ? String(body[key]).toLowerCase() : body[key]);
+  Object.entries(map).forEach(([k, col]) => {
+    if (body[k] !== undefined) {
+      fields.push(`${col} = $${fields.length + 1}`);
+      values.push(body[k]);
     }
   });
-
   if (!fields.length) {
-    return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400, headers: H });
+    return NextResponse.json({ error: "Nada para atualizar" }, { status: 400, headers: H });
   }
+  values.push(params.id);
 
-  values.push(params.id, session.user.ecosystemId);
   const { rows } = await q(
-    `UPDATE users SET ${fields.join(
-      ", ",
-    )}, updated_at = NOW() WHERE id = $${values.length - 1} AND ecosystem_id = $${values.length} RETURNING *`,
+    `UPDATE users SET ${fields.join(", ")}, updated_at = NOW() WHERE id = $${values.length} RETURNING *`,
     values,
   );
-
-  if (!rows[0]) {
-    return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404, headers: H });
+  const u = rows[0];
+  if (!u) {
+    return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
 
-  return NextResponse.json(sanitizeUser(rows[0] as any), { headers: H });
+  return NextResponse.json(
+    {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      department: u.department,
+      phone: u.phone,
+      inviteCode: u.invite_code,
+      isActive: u.is_active,
+      lastLoginAt: u.last_login_at,
+      createdAt: u.created_at,
+      updatedAt: u.updated_at,
+    },
+    { headers: H },
+  );
 }

@@ -44,14 +44,19 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
   try {
+    const params = context?.params as { id?: string } | undefined;
+    const conversationId = params?.id;
+    if (!conversationId) {
+      return NextResponse.json({ error: "Conversa nao encontrada" }, { status: 404, headers: H });
+    }
     const session = await requireAuth(req);
     if (!session) {
       return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
     }
 
-    const allowed = await ensureParticipant(params.id, session.user.id, session.user.ecosystemId);
+    const allowed = await ensureParticipant(conversationId, session.user.id, session.user.ecosystemId);
     if (!allowed) {
       return NextResponse.json({ error: "Conversa nao encontrada" }, { status: 404, headers: H });
     }
@@ -60,7 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
     const before = searchParams.get("before");
 
-    const sqlParams: any[] = [params.id];
+    const sqlParams: any[] = [conversationId];
     let sql = `SELECT m.*, u.name AS sender_name, u.email AS sender_email
                FROM chat_messages m
                LEFT JOIN users u ON u.id = m.sender_id
@@ -90,7 +95,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     await q(
       "UPDATE chat_participants SET last_read_at = NOW() WHERE conversation_id = $1 AND user_id = $2",
-      [params.id, session.user.id],
+      [conversationId, session.user.id],
     );
 
     return NextResponse.json(messages, { headers: H });
@@ -99,14 +104,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, context: any) {
   try {
+    const params = context?.params as { id?: string } | undefined;
+    const conversationId = params?.id;
+    if (!conversationId) {
+      return NextResponse.json({ error: "Conversa nao encontrada" }, { status: 404, headers: H });
+    }
     const session = await requireAuth(req);
     if (!session) {
       return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
     }
 
-    const allowed = await ensureParticipant(params.id, session.user.id, session.user.ecosystemId);
+    const allowed = await ensureParticipant(conversationId, session.user.id, session.user.ecosystemId);
     if (!allowed) {
       return NextResponse.json({ error: "Conversa nao encontrada" }, { status: 404, headers: H });
     }
@@ -125,7 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { rows } = await q(
       `INSERT INTO chat_messages (conversation_id, sender_id, content, attachments)
        VALUES ($1,$2,$3,$4) RETURNING *`,
-      [params.id, session.user.id, content, JSON.stringify(attachments)],
+      [conversationId, session.user.id, content, JSON.stringify(attachments)],
     );
     const message = rows[0];
 
@@ -138,13 +148,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       [
         message.created_at,
         content ? content.slice(0, 140) : "Arquivo enviado",
-        params.id,
+        conversationId,
+        conversationId,
       ],
     );
 
     await q(
       "UPDATE chat_participants SET last_read_at = NOW() WHERE conversation_id = $1 AND user_id = $2",
-      [params.id, session.user.id],
+      [conversationId, session.user.id],
     );
 
     // Notificar outros participantes do chat
@@ -154,12 +165,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
          FROM chat_participants cp
          JOIN users u ON u.id = cp.user_id
          WHERE cp.conversation_id = $1 AND cp.user_id <> $2`,
-        [params.id, session.user.id],
+        [conversationId, session.user.id],
       );
       const senderName = session.user.name || "Usuario";
       const title = "Nova mensagem no chat";
       const msg = `${senderName} enviou uma mensagem`;
-      const actionUrl = `/chat?conversation=${params.id}`;
+      const actionUrl = `/chat?conversation=${conversationId}`;
       await Promise.all(
         recipients.map((r: any) =>
           createNotification({

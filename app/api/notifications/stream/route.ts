@@ -33,29 +33,28 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
   }
 
+  let keepAlive: NodeJS.Timeout | null = null;
+  let unsubscribe: (() => void) | null = null;
+
   const stream = new ReadableStream({
     start(controller) {
       const send = (data: any) => {
         controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
       };
       // Keep-alive
-      const keepAlive = setInterval(() => send({ type: "ping" }), 15000);
+      keepAlive = setInterval(() => send({ type: "ping" }), 15000);
 
-      const unsubscribe = subscribeNotifications((payload) => {
+      unsubscribe = subscribeNotifications((payload) => {
         if (payload.userId === session.user.id) {
           send({ type: "notification", data: payload.data });
         }
       });
 
-      // On close
       controller.enqueue(`data: ${JSON.stringify({ type: "ready" })}\n\n`);
-      controller.closed.then(() => {
-        clearInterval(keepAlive);
-        unsubscribe();
-      }).catch(() => {
-        clearInterval(keepAlive);
-        unsubscribe();
-      });
+    },
+    cancel() {
+      if (keepAlive) clearInterval(keepAlive);
+      if (unsubscribe) unsubscribe();
     },
   });
 

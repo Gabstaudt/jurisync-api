@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
@@ -15,7 +15,11 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json({ error: "Contrato nao encontrado" }, { status: 404, headers: H });
+  }
   const { rows } = await q(
     "SELECT * FROM contract_notifications WHERE contract_id = $1 ORDER BY created_at DESC",
     [params.id],
@@ -37,42 +41,44 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json(data, { headers: H });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, context: any) {
+  const params = (context?.params || {}) as { id?: string };
+  if (!params.id) {
+    return NextResponse.json({ error: "Contrato nao encontrado" }, { status: 404, headers: H });
+  }
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json(
-      { error: "Não autenticado" },
+      { error: "Nao autenticado" },
       { status: 401, headers: H },
     );
   }
 
   const body = await req.json().catch(() => ({}));
-  const type = body.type || "custom";
-  if (!["expiry_reminder", "expiry_warning", "custom"].includes(type)) {
+  const recipients = body.recipients || [];
+  if (!Array.isArray(recipients) || !recipients.length) {
     return NextResponse.json(
-      { error: "Tipo inválido" },
+      { error: "Destinatarios obrigatorios" },
       { status: 400, headers: H },
     );
   }
 
-  const recipients = Array.isArray(body.recipients) ? body.recipients : [];
-  if (!recipients.length) {
-    return NextResponse.json(
-      { error: "Destinatários são obrigatórios" },
-      { status: 400, headers: H },
-    );
-  }
-
-  const scheduled = body.scheduledFor
-    ? new Date(body.scheduledFor)
-    : new Date();
+  const scheduledFor = body.scheduledFor ? new Date(body.scheduledFor) : new Date();
 
   const { rows } = await q(
     `INSERT INTO contract_notifications
       (contract_id, type, message, recipients, scheduled_for, is_active, created_by)
-     VALUES ($1,$2,$3,$4,$5,TRUE,$6)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      RETURNING *`,
-    [params.id, type, body.message || null, recipients, scheduled, session.user.id],
+    [
+      params.id,
+      body.type || "custom",
+      body.message || null,
+      recipients,
+      scheduledFor,
+      body.isActive ?? true,
+      session.user.id,
+    ],
   );
 
   const n = rows[0];
