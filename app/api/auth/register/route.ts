@@ -1,6 +1,8 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { createSession, hashPassword, sanitizeUser } from "@/lib/auth";
+import { sendMail } from "@/lib/mailer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,9 +106,10 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await hashPassword(password);
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
     const { rows: created } = await q(
-      `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id, email_verified, email_verification_token)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
       [
         name,
         email,
@@ -116,11 +119,25 @@ export async function POST(req: Request) {
         phone,
         accessCode || null,
         ecosystemId,
+        false,
+        verificationCode,
       ],
     );
     const userRow = created[0] as any;
 
     const session = await createSession(userRow.id);
+
+    // Enviar email de boas-vindas + confirmação
+    try {
+      await sendMail({
+        to: email,
+        subject: "Bem-vindo ao JuriSync - confirme seu email",
+        text: `Olá ${name},\n\nBem-vindo ao JuriSync! Digite o código abaixo na aplicação para confirmar seu email:\n\n${verificationCode}\n\nSe não reconhece esta conta, ignore este email.`,
+        html: `<p>Olá ${name},</p><p>Bem-vindo ao JuriSync!</p><p>Digite o código abaixo na aplicação para confirmar seu email:</p><p style="font-size:20px;font-weight:bold;">${verificationCode}</p><p>Se não reconhece esta conta, ignore este email.</p>`,
+      });
+    } catch (mailErr) {
+      console.warn("Falha ao enviar email de boas-vindas:", mailErr);
+    }
 
     return NextResponse.json(
       { token: session.token, user: sanitizeUser(userRow) },
