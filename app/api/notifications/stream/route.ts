@@ -5,14 +5,19 @@ import { subscribeNotifications } from "@/lib/notificationStream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const H = {
-  "Access-Control-Allow-Origin": "*",
+const baseHeaders = {
   "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Credentials": "true",
 };
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: H });
+const withCors = (req: Request) => {
+  const origin = req.headers.get("origin") || "*";
+  return { ...baseHeaders, "Access-Control-Allow-Origin": origin };
+};
+
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200, headers: withCors(req) });
 }
 
 export async function GET(req: Request) {
@@ -25,12 +30,12 @@ export async function GET(req: Request) {
     token = headerAuth.slice(7).trim();
   }
   if (!token) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
   }
 
   const session = await getUserByToken(token);
   if (!session) {
-    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
   }
 
   let keepAlive: NodeJS.Timeout | null = null;
@@ -61,7 +66,7 @@ export async function GET(req: Request) {
   return new Response(stream, {
     status: 200,
     headers: {
-      ...H,
+      ...withCors(req),
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",

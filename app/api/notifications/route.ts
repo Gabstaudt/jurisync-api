@@ -9,21 +9,26 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const H = {
-  "Access-Control-Allow-Origin": "*",
+const baseHeaders = {
   "Access-Control-Allow-Methods": "GET,PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Credentials": "true",
 };
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: H });
+const withCors = (req: Request) => {
+  const origin = req.headers.get("origin") || "*";
+  return { ...baseHeaders, "Access-Control-Allow-Origin": origin };
+};
+
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200, headers: withCors(req) });
 }
 
 export async function GET(req: Request) {
   try {
     const session = await requireAuth(req);
     if (!session) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
     }
 
     const rows = await listNotifications(session.user.id);
@@ -36,9 +41,9 @@ export async function GET(req: Request) {
       isRead: r.is_read,
       createdAt: r.created_at,
     }));
-    return NextResponse.json(data, { headers: H });
+    return NextResponse.json(data, { headers: withCors(req) });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: H });
+    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: withCors(req) });
   }
 }
 
@@ -46,19 +51,19 @@ export async function PATCH(req: Request) {
   try {
     const session = await requireAuth(req);
     if (!session) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
     }
     const body = await req.json().catch(() => ({}));
     if (body.markAll) {
       await markAllNotificationsRead(session.user.id);
-      return NextResponse.json({ ok: true }, { headers: H });
+      return NextResponse.json({ ok: true }, { headers: withCors(req) });
     }
     if (!body.id) {
-      return NextResponse.json({ error: "id obrigatorio" }, { status: 400, headers: H });
+      return NextResponse.json({ error: "id obrigatorio" }, { status: 400, headers: withCors(req) });
     }
     await markNotificationRead(session.user.id, body.id);
-    return NextResponse.json({ ok: true }, { headers: H });
+    return NextResponse.json({ ok: true }, { headers: withCors(req) });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: H });
+    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: withCors(req) });
   }
 }

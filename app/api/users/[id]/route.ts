@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { q } from "@/lib/db";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, sanitizeUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,22 +31,7 @@ export async function GET(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
 
-  return NextResponse.json(
-    {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      department: u.department,
-      phone: u.phone,
-      inviteCode: u.invite_code,
-      isActive: u.is_active,
-      lastLoginAt: u.last_login_at,
-      createdAt: u.created_at,
-      updatedAt: u.updated_at,
-    },
-    { headers: H },
-  );
+  return NextResponse.json(sanitizeUser(u as any), { headers: H });
 }
 
 export async function PATCH(req: NextRequest, context: any) {
@@ -64,6 +49,7 @@ export async function PATCH(req: NextRequest, context: any) {
   if (session.user.role !== "admin") {
     delete body.role;
     delete body.isActive;
+    delete body.isPending;
   }
 
   const fields: string[] = [];
@@ -75,6 +61,7 @@ export async function PATCH(req: NextRequest, context: any) {
     department: "department",
     phone: "phone",
     isActive: "is_active",
+    isPending: "is_pending",
   };
   Object.entries(map).forEach(([k, col]) => {
     if (body[k] !== undefined) {
@@ -96,20 +83,5 @@ export async function PATCH(req: NextRequest, context: any) {
     return NextResponse.json({ error: "Usuario nao encontrado" }, { status: 404, headers: H });
   }
 
-  return NextResponse.json(
-    {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      department: u.department,
-      phone: u.phone,
-      inviteCode: u.invite_code,
-      isActive: u.is_active,
-      lastLoginAt: u.last_login_at,
-      createdAt: u.created_at,
-      updatedAt: u.updated_at,
-    },
-    { headers: H },
-  );
+  return NextResponse.json(sanitizeUser(u as any), { headers: H });
 }
