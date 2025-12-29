@@ -69,7 +69,7 @@ export async function POST(req: Request) {
           WHERE code = $1
             AND is_active = TRUE
             AND (expires_at IS NULL OR expires_at > NOW())
-            AND used_count < max_uses`,
+            AND COALESCE(used_count, 0) < COALESCE(max_uses, 1)`,
         [accessCode],
       );
       const code = codeRows[0] as any;
@@ -90,8 +90,11 @@ export async function POST(req: Request) {
         `UPDATE access_codes
             SET used_at = NOW(),
                 used_by = $1,
-                used_count = used_count + 1,
-                is_active = CASE WHEN used_count + 1 >= max_uses THEN FALSE ELSE TRUE END
+                used_count = COALESCE(used_count, 0) + 1,
+                is_active = CASE
+                  WHEN COALESCE(used_count, 0) + 1 >= COALESCE(max_uses, 1) THEN FALSE
+                  ELSE TRUE
+                END
           WHERE id = $2`,
         [null, code.id],
       );

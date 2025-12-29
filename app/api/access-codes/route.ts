@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const baseHeaders = {
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
   "Access-Control-Allow-Headers": "*",
   "Access-Control-Allow-Credentials": "true",
 };
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
         AND is_active = TRUE
         AND (
           (expires_at IS NOT NULL AND expires_at <= NOW())
-          OR used_count >= max_uses
+          OR COALESCE(used_count, 0) >= COALESCE(max_uses, 1)
         )`,
     [session.user.ecosystemId],
   );
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       WHERE ecosystem_id = $1
         AND is_active = TRUE
         AND (expires_at IS NULL OR expires_at > NOW())
-        AND used_count < max_uses
+        AND COALESCE(used_count, 0) < COALESCE(max_uses, 1)
       ORDER BY created_at DESC`,
     [session.user.ecosystemId],
   );
