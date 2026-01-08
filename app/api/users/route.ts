@@ -83,8 +83,8 @@ export async function POST(req: Request) {
   const passwordHash = await hashPassword(generatedPassword);
   const activationToken = crypto.randomBytes(24).toString("hex");
   const { rows } = await q(
-    `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id, email_verified, email_verification_token, is_active, is_pending, activation_token)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO users (name, email, password_hash, role, department, phone, invite_code, ecosystem_id, email_verified, email_verification_token, is_active, is_pending, activation_token, permissions)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
     [
       name,
       email,
@@ -99,6 +99,7 @@ export async function POST(req: Request) {
       false, // is_active
       true, // is_pending
       activationToken,
+      body.permissions || null,
     ],
   );
 

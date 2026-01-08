@@ -45,6 +45,10 @@ export async function PATCH(req: NextRequest, context: any) {
   }
 
   const body = await req.json().catch(() => ({}));
+  if (body.permissions && typeof body.permissions === "object") {
+    // ensure json
+    body.permissions = body.permissions;
+  }
 
   if (session.user.role !== "admin") {
     delete body.role;
@@ -62,6 +66,7 @@ export async function PATCH(req: NextRequest, context: any) {
     phone: "phone",
     isActive: "is_active",
     isPending: "is_pending",
+    permissions: "permissions",
   };
   Object.entries(map).forEach(([k, col]) => {
     if (body[k] !== undefined) {
