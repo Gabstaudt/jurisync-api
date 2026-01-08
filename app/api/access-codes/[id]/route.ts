@@ -20,13 +20,16 @@ export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 200, headers: withCors(req) });
 }
 
-export async function DELETE(req: NextRequest, context: { params?: { id?: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
   const session = await requireAuth(req);
   if (!session || session.user.role !== "admin") {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403, headers: withCors(req) });
   }
 
-  const id = context?.params?.id;
+  const id = params?.id;
   if (!id) {
     return NextResponse.json({ error: "ID obrigatorio" }, { status: 400, headers: withCors(req) });
   }
