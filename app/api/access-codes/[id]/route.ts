@@ -15,9 +15,12 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function DELETE(req: NextRequest, context: { params: { id?: string } }) {
-  const params = context?.params || {};
-  if (!params.id) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  if (!id) {
     return NextResponse.json({ error: "Codigo nao encontrado" }, { status: 404, headers: H });
   }
 
@@ -29,7 +32,7 @@ export async function DELETE(req: NextRequest, context: { params: { id?: string 
   try {
     const { rowCount } = await q(
       "UPDATE access_codes SET is_active = FALSE WHERE id = $1 AND ecosystem_id = $2",
-      [params.id, session.user.ecosystemId],
+      [id, session.user.ecosystemId],
     );
     if (!rowCount) {
       return NextResponse.json({ error: "Codigo nao encontrado" }, { status: 404, headers: H });
