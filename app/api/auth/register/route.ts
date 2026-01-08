@@ -65,7 +65,11 @@ export async function POST(req: Request) {
         );
       }
       const { rows: codeRows } = await q(
-        `SELECT * FROM access_codes WHERE code = $1 AND is_active = TRUE`,
+        `SELECT * FROM access_codes
+          WHERE code = $1
+            AND is_active = TRUE
+            AND (expires_at IS NULL OR expires_at > NOW())
+            AND COALESCE(used_count, 0) < COALESCE(max_uses, 1)`,
         [accessCode],
       );
       const code = codeRows[0] as any;
@@ -81,15 +85,17 @@ export async function POST(req: Request) {
           { status: 400, headers: H },
         );
       }
-      if (code.expires_at && new Date(code.expires_at) < new Date()) {
-        return NextResponse.json(
-          { error: "Código expirado" },
-          { status: 400, headers: H },
-        );
-      }
       ecosystemId = code.ecosystem_id;
       await q(
-        "UPDATE access_codes SET used_at = NOW(), used_by = $1, is_active = FALSE WHERE id = $2",
+        `UPDATE access_codes
+            SET used_at = NOW(),
+                used_by = $1,
+                used_count = COALESCE(used_count, 0) + 1,
+                is_active = CASE
+                  WHEN COALESCE(used_count, 0) + 1 >= COALESCE(max_uses, 1) THEN FALSE
+                  ELSE TRUE
+                END
+          WHERE id = $2`,
         [null, code.id],
       );
     }
