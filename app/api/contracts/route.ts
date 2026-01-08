@@ -6,10 +6,15 @@ import { createNotification } from "@/lib/notifications";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const H = {
-  "Access-Control-Allow-Origin": "*",
+const baseHeaders = {
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+const withCors = (req: Request) => {
+  const origin = req.headers.get("origin") || "*";
+  return { ...baseHeaders, "Access-Control-Allow-Origin": origin };
 };
 
 const parsePermissions = (value: any) => {
@@ -75,8 +80,8 @@ const mapRow = (r: any) => {
   };
 };
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: H });
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200, headers: withCors(req) });
 }
 
 // GET /api/contracts?status=active&q=Acme&page=1&limit=20&folderId=uuid
@@ -85,7 +90,7 @@ export async function GET(req: Request) {
   if (!session) {
     return NextResponse.json(
       { error: "Não autenticado" },
-      { status: 401, headers: H },
+      { status: 401, headers: withCors(req) },
     );
   }
   const { searchParams } = new URL(req.url);
@@ -131,9 +136,9 @@ export async function GET(req: Request) {
 
   try {
     const { rows } = await q(sql, [...params, session.user.ecosystemId]);
-    return NextResponse.json((rows as any[]).map(mapRow), { headers: H });
+    return NextResponse.json((rows as any[]).map(mapRow), { headers: withCors(req) });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500, headers: H });
+    return NextResponse.json({ error: e.message }, { status: 500, headers: withCors(req) });
   }
 }
 
@@ -144,7 +149,7 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json(
         { error: "Não autenticado" },
-        { status: 401, headers: H },
+        { status: 401, headers: withCors(req) },
       );
     }
 
@@ -220,7 +225,7 @@ export async function POST(req: Request) {
       if (!data?.[k]) {
         return NextResponse.json(
           { error: `campo obrigatório: ${k}` },
-          { status: 400, headers: H },
+          { status: 400, headers: withCors(req) },
         );
       }
     }
@@ -297,8 +302,8 @@ export async function POST(req: Request) {
       // silencioso para não quebrar criação de contrato
     }
 
-    return NextResponse.json(mapRow(created), { status: 201, headers: H });
+    return NextResponse.json(mapRow(created), { status: 201, headers: withCors(req) });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 400, headers: H });
+    return NextResponse.json({ error: e.message }, { status: 400, headers: withCors(req) });
   }
 }

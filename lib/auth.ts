@@ -14,7 +14,10 @@ export interface DbUser {
   department: string | null;
   phone: string | null;
   invite_code: string | null;
+  is_pending: boolean;
   is_active: boolean;
+  email_verified: boolean;
+  email_verification_token: string | null;
   last_login_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -30,6 +33,8 @@ export interface PublicUser {
   phone?: string | null;
   inviteCode?: string | null;
   isActive: boolean;
+  emailVerified: boolean;
+  isPending: boolean;
   lastLoginAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -51,7 +56,9 @@ export function sanitizeUser(row: DbUser): PublicUser {
     department: row.department,
     phone: row.phone,
     inviteCode: row.invite_code,
+    isPending: row.is_pending ?? false,
     isActive: row.is_active,
+    emailVerified: row.email_verified ?? false,
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -71,9 +78,10 @@ export const bearerFromRequest = (req: Request): string | null => {
 };
 
 export async function getUserByEmail(email: string): Promise<DbUser | null> {
-  const { rows } = await q("SELECT * FROM users WHERE email = $1", [
-    email.toLowerCase(),
-  ]);
+  const { rows } = await q(
+    "SELECT * FROM users WHERE email = $1 ORDER BY created_at DESC LIMIT 1",
+    [email.toLowerCase()],
+  );
   return (rows[0] as DbUser | undefined) ?? null;
 }
 

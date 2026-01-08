@@ -5,10 +5,15 @@ import { requireAuth } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const H = {
-  "Access-Control-Allow-Origin": "*",
+const baseHeaders = {
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+const withCors = (req: Request) => {
+  const origin = req.headers.get("origin") || "*";
+  return { ...baseHeaders, "Access-Control-Allow-Origin": origin };
 };
 
 type Attachment = {
@@ -28,15 +33,15 @@ const parseAttachments = (value: any): Attachment[] => {
   }
 };
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: H });
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 200, headers: withCors(req) });
 }
 
 export async function GET(req: Request) {
   try {
     const session = await requireAuth(req);
     if (!session) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
     }
 
     const { rows: convRows } = await q(
@@ -121,9 +126,9 @@ export async function GET(req: Request) {
       updatedAt: c.updated_at,
     }));
 
-    return NextResponse.json(result, { headers: H });
+    return NextResponse.json(result, { headers: withCors(req) });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: H });
+    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: withCors(req) });
   }
 }
 
@@ -131,7 +136,7 @@ export async function POST(req: Request) {
   try {
     const session = await requireAuth(req);
     if (!session) {
-      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
+      return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: withCors(req) });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -142,7 +147,7 @@ export async function POST(req: Request) {
     if (participants.length < 2) {
       return NextResponse.json(
         { error: "Informe pelo menos um destinatario" },
-        { status: 400, headers: H },
+        { status: 400, headers: withCors(req) },
       );
     }
 
@@ -154,7 +159,7 @@ export async function POST(req: Request) {
     if (validIds.length !== participants.length) {
       return NextResponse.json(
         { error: "Participante invalido para este ecossistema" },
-        { status: 400, headers: H },
+        { status: 400, headers: withCors(req) },
       );
     }
 
@@ -231,9 +236,9 @@ export async function POST(req: Request) {
         created: !body.skipCreatedFlag,
         message,
       },
-      { status: 201, headers: H },
+      { status: 201, headers: withCors(req) },
     );
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: H });
+    return NextResponse.json({ error: e?.message || "Erro interno" }, { status: 500, headers: withCors(req) });
   }
 }
