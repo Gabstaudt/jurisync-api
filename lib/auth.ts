@@ -19,7 +19,6 @@ export interface DbUser {
   email_verified: boolean;
   email_verification_token: string | null;
   permissions: any | null;
-  permissions: any | null;
   last_login_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -37,7 +36,6 @@ export interface PublicUser {
   isActive: boolean;
   emailVerified: boolean;
   isPending: boolean;
-  permissions?: any | null;
   permissions?: any | null;
   lastLoginAt?: Date | null;
   createdAt: Date;
@@ -63,7 +61,6 @@ export function sanitizeUser(row: DbUser): PublicUser {
     isPending: row.is_pending ?? false,
     isActive: row.is_active,
     emailVerified: row.email_verified ?? false,
-    permissions: row.permissions ?? null,
     permissions: row.permissions ?? null,
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
