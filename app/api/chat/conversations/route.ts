@@ -116,6 +116,7 @@ export async function GET(req: Request) {
     const result = convRows.map((c: any) => ({
       id: c.id,
       title: c.title,
+      teamId: c.team_id,
       isGroup: c.is_group,
       participants: participantsMap[c.id] || [],
       lastMessage: lastMessageMap[c.id] || null,
@@ -140,64 +141,112 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const rawParticipants: string[] = Array.isArray(body.participantIds) ? body.participantIds : [];
-    const uniqueParticipants = Array.from(new Set([...rawParticipants, session.user.id]));
-    const participants = uniqueParticipants.filter((id) => id);
-
-    if (participants.length < 2) {
-      return NextResponse.json(
-        { error: "Informe pelo menos um destinatario" },
-        { status: 400, headers: withCors(req) },
-      );
-    }
-
-    const { rows: validUsers } = await q(
-      "SELECT id FROM users WHERE id = ANY($1::uuid[]) AND ecosystem_id = $2",
-      [participants, session.user.ecosystemId],
-    );
-    const validIds = validUsers.map((u: any) => u.id);
-    if (validIds.length !== participants.length) {
-      return NextResponse.json(
-        { error: "Participante invalido para este ecossistema" },
-        { status: 400, headers: withCors(req) },
-      );
-    }
-
-    const participantsSorted = [...participants].sort();
-    const isGroup = Boolean(body.title) || participantsSorted.length > 2;
-
+    const teamId = body.teamId as string | undefined;
+    let participants: string[] = [];
     let conversationId: string | null = null;
-    if (!isGroup) {
+    let title: string | null = body.title || null;
+    let isGroup = false;
+
+    if (teamId) {
+      // Conversa de equipe
+      const { rows: teamRows } = await q(
+        `SELECT t.id, t.name
+         FROM teams t
+         WHERE t.id = $1 AND t.ecosystem_id = $2`,
+        [teamId, session.user.ecosystemId],
+      );
+      const team = teamRows[0];
+      if (!team) {
+        return NextResponse.json({ error: "Equipe nao encontrada" }, { status: 404, headers: withCors(req) });
+      }
+
+      const { rows: memberRows } = await q(
+        "SELECT user_id FROM team_members WHERE team_id = $1",
+        [teamId],
+      );
+      participants = memberRows.map((m: any) => m.user_id);
+      if (!participants.includes(session.user.id)) {
+        participants.push(session.user.id); // garante quem criou
+      }
+      const unique = Array.from(new Set(participants));
+      participants = unique;
+
       const { rows: existing } = await q(
-        `SELECT c.id, ARRAY_AGG(cp.user_id ORDER BY cp.user_id) AS member_ids
-         FROM chat_conversations c
-         JOIN chat_participants cp ON cp.conversation_id = c.id
-         WHERE c.ecosystem_id = $1 AND c.is_group = FALSE
-         GROUP BY c.id
-         HAVING ARRAY_AGG(cp.user_id ORDER BY cp.user_id) = $2::uuid[]`,
-        [session.user.ecosystemId, participantsSorted],
+        "SELECT id FROM chat_conversations WHERE ecosystem_id = $1 AND team_id = $2 LIMIT 1",
+        [session.user.ecosystemId, teamId],
       );
       if (existing[0]) {
         conversationId = existing[0].id;
+      } else {
+        const { rows } = await q(
+          `INSERT INTO chat_conversations (ecosystem_id, title, is_group, created_by, team_id)
+           VALUES ($1,$2,TRUE,$3,$4) RETURNING *`,
+          [session.user.ecosystemId, team.name, session.user.id, teamId],
+        );
+        conversationId = rows[0].id;
+      }
+      title = team.name;
+      isGroup = true;
+    } else {
+      const rawParticipants: string[] = Array.isArray(body.participantIds) ? body.participantIds : [];
+      const uniqueParticipants = Array.from(new Set([...rawParticipants, session.user.id]));
+      participants = uniqueParticipants.filter((id) => id);
+
+      if (participants.length < 2) {
+        return NextResponse.json(
+          { error: "Informe pelo menos um destinatario" },
+          { status: 400, headers: withCors(req) },
+        );
+      }
+
+      const { rows: validUsers } = await q(
+        "SELECT id FROM users WHERE id = ANY($1::uuid[]) AND ecosystem_id = $2",
+        [participants, session.user.ecosystemId],
+      );
+      const validIds = validUsers.map((u: any) => u.id);
+      if (validIds.length !== participants.length) {
+        return NextResponse.json(
+          { error: "Participante invalido para este ecossistema" },
+          { status: 400, headers: withCors(req) },
+        );
+      }
+
+      const participantsSorted = [...participants].sort();
+      isGroup = Boolean(body.title) || participantsSorted.length > 2;
+
+      if (!isGroup) {
+        const { rows: existing } = await q(
+          `SELECT c.id, ARRAY_AGG(cp.user_id ORDER BY cp.user_id) AS member_ids
+           FROM chat_conversations c
+           JOIN chat_participants cp ON cp.conversation_id = c.id
+           WHERE c.ecosystem_id = $1 AND c.is_group = FALSE AND c.team_id IS NULL
+           GROUP BY c.id
+           HAVING ARRAY_AGG(cp.user_id ORDER BY cp.user_id) = $2::uuid[]`,
+          [session.user.ecosystemId, participantsSorted],
+        );
+        if (existing[0]) {
+          conversationId = existing[0].id;
+        }
+      }
+
+      if (!conversationId) {
+        const { rows } = await q(
+          `INSERT INTO chat_conversations (ecosystem_id, title, is_group, created_by, team_id)
+           VALUES ($1,$2,$3,$4,NULL) RETURNING *`,
+          [session.user.ecosystemId, body.title || null, isGroup, session.user.id],
+        );
+        conversationId = rows[0].id;
       }
     }
 
-    if (!conversationId) {
-      const { rows } = await q(
-        `INSERT INTO chat_conversations (ecosystem_id, title, is_group, created_by)
-         VALUES ($1,$2,$3,$4) RETURNING *`,
-        [session.user.ecosystemId, body.title || null, isGroup, session.user.id],
+    // garante participantes
+    for (const pid of participants) {
+      await q(
+        `INSERT INTO chat_participants (conversation_id, user_id, last_read_at)
+         VALUES ($1,$2,$3)
+         ON CONFLICT DO NOTHING`,
+        [conversationId, pid, pid === session.user.id ? new Date() : null],
       );
-      conversationId = rows[0].id;
-
-      for (const pid of participants) {
-        await q(
-          `INSERT INTO chat_participants (conversation_id, user_id, last_read_at)
-           VALUES ($1,$2,$3)
-           ON CONFLICT DO NOTHING`,
-          [conversationId, pid, pid === session.user.id ? new Date() : null],
-        );
-      }
     }
 
     let message = null;
