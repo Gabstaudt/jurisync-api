@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const { name, members } = body || {};
+  const { name, description, members } = body || {};
 
   const updates: string[] = [];
   const paramsList: any[] = [];
@@ -51,6 +51,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     updates.push(`name = $${idx++}`);
     paramsList.push(name.trim());
+  }
+  if (description !== undefined) {
+    updates.push(`description = $${idx++}`);
+    paramsList.push(description || null);
   }
 
   updates.push(`updated_at = NOW()`);

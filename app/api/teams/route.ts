@@ -51,17 +51,17 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, members = [] } = body || {};
+  const { name, description = null, members = [] } = body || {};
 
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Nome obrigatorio" }, { status: 400, headers: H });
   }
 
   const { rows } = await q(
-    `INSERT INTO teams (name, ecosystem_id, created_by)
-     VALUES ($1, $2, $3)
+    `INSERT INTO teams (name, description, ecosystem_id, created_by)
+     VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [name.trim(), session.user.ecosystemId, session.user.id],
+    [name.trim(), description || null, session.user.ecosystemId, session.user.id],
   );
 
   const team = rows[0];

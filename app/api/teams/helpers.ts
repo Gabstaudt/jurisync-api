@@ -3,6 +3,7 @@ import { q } from "@/lib/db";
 export type TeamRow = {
   id: string;
   name: string;
+  description: string | null;
   ecosystem_id: string;
   created_by: string | null;
   created_at: Date | string;
@@ -14,6 +15,7 @@ export function mapTeam(row: TeamRow) {
   return {
     id: row.id,
     name: row.name,
+    description: row.description,
     ecosystemId: row.ecosystem_id,
     createdBy: row.created_by,
     createdAt: row.created_at,
