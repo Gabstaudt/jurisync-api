@@ -21,12 +21,12 @@ export async function GET(req: NextRequest) {
   const { rows } = await q(
     `
     SELECT ct.*, u.name AS created_by_name
-    FROM contract_templates
+    FROM contract_templates ct
     LEFT JOIN users u ON u.id = ct.created_by
-    WHERE ecosystem_id = $1
-      AND is_active = TRUE
-      AND ($2::text IS NULL OR lower(name) LIKE $2 OR lower(COALESCE(description,'')) LIKE $2)
-    ORDER BY created_at DESC
+    WHERE ct.ecosystem_id = $1
+      AND ct.is_active = TRUE
+      AND ($2::text IS NULL OR lower(ct.name) LIKE $2 OR lower(COALESCE(ct.description,'')) LIKE $2)
+    ORDER BY ct.created_at DESC
     `,
     [session.user.ecosystemId, term],
   );
