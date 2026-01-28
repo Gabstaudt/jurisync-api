@@ -9,12 +9,12 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { session, error } = await requireSession(req);
   if (!session) {
     return NextResponse.json({ error }, { status: 401, headers: H });
   }
-  const { id } = params || {};
   const { rows: templateRows } = await q(
     `SELECT ct.*, u.name AS created_by_name
      FROM contract_templates ct
@@ -41,12 +41,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   );
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { session, error } = await requireSession(req);
   if (!session) {
     return NextResponse.json({ error }, { status: 401, headers: H });
   }
-  const { id } = params || {};
   const body = await req.json();
   const { name, description, filePath, fileName, fileType, fileSize } = body || {};
 
@@ -90,12 +90,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(mapTemplate(rows[0]), { headers: H });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { session, error } = await requireSession(req);
   if (!session) {
     return NextResponse.json({ error }, { status: 401, headers: H });
   }
-  const { id } = params || {};
   const { rowCount } = await q(
     `UPDATE contract_templates SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND ecosystem_id = $2`,
     [id, session.user.ecosystemId],

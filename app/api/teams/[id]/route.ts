@@ -16,20 +16,22 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
   }
 
-  const team = await fetchTeamWithMembers(params.id, session.user.ecosystemId);
+  const team = await fetchTeamWithMembers(id, session.user.ecosystemId);
   if (!team) {
     return NextResponse.json({ error: "Equipe nao encontrada" }, { status: 404, headers: H });
   }
   return NextResponse.json(team, { headers: H });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
@@ -58,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   updates.push(`updated_at = NOW()`);
-  paramsList.push(params.id, session.user.ecosystemId);
+  paramsList.push(id, session.user.ecosystemId);
 
   const { rows } = await q(
     `UPDATE teams SET ${updates.join(", ")}
@@ -77,7 +79,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(full, { headers: H });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const session = await requireAuth(req);
   if (!session) {
     return NextResponse.json({ error: "Nao autenticado" }, { status: 401, headers: H });
@@ -87,7 +90,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   const { rowCount } = await q("DELETE FROM teams WHERE id = $1 AND ecosystem_id = $2", [
-    params.id,
+    id,
     session.user.ecosystemId,
   ]);
   if (!rowCount) {
