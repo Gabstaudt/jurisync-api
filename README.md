@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Este repositório contém o backend (API) do JuriSync, responsável por toda a lógica de negócio, persistência de dados e regras do sistema jurídico.
 
-## Getting Started
+A API centraliza o gerenciamento de processos, contratos e dados jurídicos, fornecendo endpoints seguros para consumo pelo frontend.
 
-First, run the development server:
+## Objetivo da API
 
-```bash
+Gerenciar processos jurídicos
+Gerenciar contratos
+Centralizar regras de negócio
+Fornecer dados ao frontend via API REST
+Garantir organização e integridade das informações
+
+## Funcionalidades da API
+
+CRUD de processos
+CRUD de contratos
+Estrutura para autenticação e permissões
+Validação de dados
+Comunicação com banco de dados
+
+## Como rodar a API
+### Pré-requisitos
+Node.js (LTS)
+Banco de dados configurado (PostgreSQL/MySQL)
+npm ou yarn
+
+### Passos
+git clone https://github.com/seu-usuario/jurisync-api.git
+cd jurisync-api
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A API será iniciada, por padrão, em:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+http://localhost:3001
+### Integração com o Frontend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+O frontend do JuriSync consome esta API para:
+Listar processos
+Listar contratos
+Criar, editar e remover registros
+Atualizar informações jurídicas
 
-## Learn More
+ ## Observações Importantes
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Este projeto representa somente o servidor
+O sistema não substitui profissionais jurídicos
+Projeto voltado para gestão e apoio operacional
