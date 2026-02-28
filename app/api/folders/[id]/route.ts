@@ -30,9 +30,9 @@ const parsePermissions = (value: any) => {
   return { isPublic: true, canView: [], canEdit: [], canManage: [] };
 };
 
-export async function GET(req: NextRequest, context: any) {
-  const params = (context?.params || {}) as { id?: string };
-  if (!params.id) {
+export async function GET(req: NextRequest, context: { params?: Promise<{ id?: string }> | { id?: string } }) {
+  const params = (await context?.params) as { id?: string } | undefined;
+  if (!params?.id) {
     return NextResponse.json({ error: "Pasta nao encontrada" }, { status: 404, headers: H });
   }
   const session = await requireAuth(req);
@@ -74,8 +74,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 export async function PATCH(req: NextRequest, context: any) {
-  const params = (context?.params || {}) as { id?: string };
-  if (!params.id) {
+  const params = (await context?.params) as { id?: string } | undefined;
+  if (!params?.id) {
     return NextResponse.json({ error: "Pasta nao encontrada" }, { status: 404, headers: H });
   }
   const session = await requireAuth(req);
@@ -155,8 +155,8 @@ export async function PATCH(req: NextRequest, context: any) {
 }
 
 export async function DELETE(req: NextRequest, context: any) {
-  const params = (context?.params || {}) as { id?: string };
-  if (!params.id) {
+  const params = (await context?.params) as { id?: string } | undefined;
+  if (!params?.id) {
     return NextResponse.json({ error: "Pasta nao encontrada" }, { status: 404, headers: H });
   }
   const session = await requireAuth(req);
