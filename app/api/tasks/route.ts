@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
     tags = [],
     folderId = null,
     contractId = null,
+    processId = null,
     assignees,
   } = body || {};
 
@@ -70,14 +71,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Prioridade invalida" }, { status: 400, headers: H });
   }
 
-  const linkError = await validateLinks(folderId, contractId, session.user.ecosystemId);
+  const linkError = await validateLinks(folderId, contractId, session.user.ecosystemId, processId);
   if (linkError) {
     return NextResponse.json({ error: linkError }, { status: 400, headers: H });
   }
 
   const { rows } = await q(
-    `INSERT INTO tasks (title, description, status, priority, due_date, tags, folder_id, contract_id, ecosystem_id, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    `INSERT INTO tasks (title, description, status, priority, due_date, tags, folder_id, contract_id, process_id, ecosystem_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [
       title,
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
       Array.isArray(tags) ? tags : [],
       folderId,
       contractId,
+      processId,
       session.user.ecosystemId,
       session.user.id,
     ],

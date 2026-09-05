@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const body = await req.json();
-  const { title, description, status, priority, dueDate, tags, folderId, contractId, assignees } = body || {};
+  const { title, description, status, priority, dueDate, tags, folderId, contractId, processId, assignees } = body || {};
 
   if (status && !TASK_STATUS.includes(status)) {
     return NextResponse.json({ error: "Status invalido" }, { status: 400, headers: H });
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Prioridade invalida" }, { status: 400, headers: H });
   }
 
-  const linkError = await validateLinks(folderId, contractId, session.user.ecosystemId);
+  const linkError = await validateLinks(folderId, contractId, session.user.ecosystemId, processId);
   if (linkError) {
     return NextResponse.json({ error: linkError }, { status: 400, headers: H });
   }
@@ -88,6 +88,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (contractId !== undefined) {
     updates.push(`contract_id = $${idx++}`);
     paramsList.push(contractId);
+  }
+  if (processId !== undefined) {
+    updates.push(`process_id = $${idx++}`);
+    paramsList.push(processId);
   }
 
   updates.push(`updated_at = NOW()`);

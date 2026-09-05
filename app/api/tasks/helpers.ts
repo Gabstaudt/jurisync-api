@@ -13,6 +13,7 @@ type TaskRow = {
   tags: string[];
   folder_id: string | null;
   contract_id: string | null;
+  process_id: string | null;
   ecosystem_id: string;
   created_by: string | null;
   created_at: Date | string;
@@ -31,6 +32,7 @@ export function mapTask(row: TaskRow) {
     tags: row.tags || [],
     folderId: row.folder_id,
     contractId: row.contract_id,
+    processId: row.process_id,
     ecosystemId: row.ecosystem_id,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -95,6 +97,7 @@ export async function validateLinks(
   folderId: string | null | undefined,
   contractId: string | null | undefined,
   ecosystemId: string,
+  processId?: string | null,
 ) {
   if (folderId) {
     const { rowCount } = await q(
@@ -113,6 +116,16 @@ export async function validateLinks(
     );
     if (!rowCount) {
       return "Contrato nao encontrado ou fora do ecossistema";
+    }
+  }
+
+  if (processId) {
+    const { rowCount } = await q(
+      "SELECT 1 FROM processes WHERE id = $1 AND ecosystem_id = $2",
+      [processId, ecosystemId],
+    );
+    if (!rowCount) {
+      return "Processo nao encontrado ou fora do ecossistema";
     }
   }
 
