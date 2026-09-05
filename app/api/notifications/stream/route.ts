@@ -49,7 +49,7 @@ export async function GET(req: Request) {
       // Keep-alive
       keepAlive = setInterval(() => send({ type: "ping" }), 15000);
 
-      unsubscribe = subscribeNotifications((payload) => {
+      unsubscribe = subscribeNotifications(session.user.id, (payload) => {
         if (payload.userId === session.user.id) {
           send({ type: "notification", data: payload.data });
         }
