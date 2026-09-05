@@ -74,6 +74,7 @@ const mapRow = (r: any) => {
     notifications: r.notifications,
     isArchived: r.is_archived,
     ownerId: r.owner_id,
+    parentContractId: r.parent_contract_id,
     createdBy: r.created_by,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -97,6 +98,7 @@ export async function GET(req: Request) {
   const status = searchParams.get("status") || undefined;
   const search = searchParams.get("q") || undefined;
   const folderId = searchParams.get("folderId") || undefined;
+  const parentContractId = searchParams.get("parentContractId") || undefined;
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(
     100,
@@ -114,6 +116,10 @@ export async function GET(req: Request) {
   if (folderId) {
     params.push(folderId);
     where.push(`folder_id = $${params.length}`);
+  }
+  if (parentContractId) {
+    params.push(parentContractId);
+    where.push(`parent_contract_id = $${params.length}`);
   }
   if (search) {
     params.push(`%${search}%`);
@@ -252,6 +258,7 @@ export async function POST(req: Request) {
       notifications: "notifications",
       isArchived: "is_archived",
       ownerId: "owner_id",
+      parentContractId: "parent_contract_id",
     };
 
     Object.entries(map).forEach(([k, col]) => {

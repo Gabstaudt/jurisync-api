@@ -93,6 +93,7 @@ const mapRow = (r: any) => ({
   notifications: r.notifications,
   isArchived: r.is_archived,
   ownerId: r.owner_id,
+  parentContractId: r.parent_contract_id,
   createdBy: r.created_by,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -220,6 +221,7 @@ export async function PATCH(req: NextRequest, context: any) {
     notifications: "notifications",
     isArchived: "is_archived",
     ownerId: "owner_id",
+    parentContractId: "parent_contract_id",
   };
 
   Object.entries(mapping).forEach(([key, column]) => {
