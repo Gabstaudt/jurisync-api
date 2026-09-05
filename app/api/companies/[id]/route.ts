@@ -15,7 +15,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function PATCH(req: NextRequest, context: { params?: Promise<{ id?: string }> | { id?: string } }) {
+export async function PATCH(req: NextRequest, context: any) {
   try {
     const params = (await context?.params) as { id?: string } | undefined;
     if (!params?.id) {
@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest, context: { params?: Promise<{ id?:
   }
 }
 
-export async function DELETE(req: NextRequest, context: { params?: Promise<{ id?: string }> | { id?: string } }) {
+export async function DELETE(req: NextRequest, context: any) {
   try {
     const params = (await context?.params) as { id?: string } | undefined;
     if (!params?.id) {

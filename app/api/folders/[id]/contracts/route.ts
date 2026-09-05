@@ -15,7 +15,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: H });
 }
 
-export async function GET(req: NextRequest, context: { params?: Promise<{ id?: string }> | { id?: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const params = (await context?.params) as { id?: string } | undefined;
   if (!params?.id) {
     return NextResponse.json({ error: "Pasta nao encontrada" }, { status: 404, headers: H });

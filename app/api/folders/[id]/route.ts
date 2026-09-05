@@ -30,7 +30,7 @@ const parsePermissions = (value: any) => {
   return { isPublic: true, canView: [], canEdit: [], canManage: [] };
 };
 
-export async function GET(req: NextRequest, context: { params?: Promise<{ id?: string }> | { id?: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const params = (await context?.params) as { id?: string } | undefined;
   if (!params?.id) {
     return NextResponse.json({ error: "Pasta nao encontrada" }, { status: 404, headers: H });
