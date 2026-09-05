@@ -4,6 +4,7 @@ const nextConfig = {
     // não roda ESLint durante o build (Vercel)
     ignoreDuringBuilds: true,
   },
+  output: "standalone",
 };
 
 export default nextConfig;
