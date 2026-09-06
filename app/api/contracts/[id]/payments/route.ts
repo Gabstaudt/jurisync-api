@@ -19,6 +19,7 @@ const mapPayment = (r: any) => ({
   status: r.status,
   paidAt: r.paid_at,
   notes: r.notes,
+  attachments: r.attachments || [],
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });

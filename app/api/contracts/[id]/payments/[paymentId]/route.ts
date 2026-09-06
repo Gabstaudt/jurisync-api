@@ -21,6 +21,7 @@ const mapPayment = (r: any) => ({
   status: r.status,
   paidAt: r.paid_at,
   notes: r.notes,
+  attachments: r.attachments || [],
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -40,7 +41,7 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => ({}));
-  const { status, amount, dueDate, notes } = body || {};
+  const { status, amount, dueDate, notes, attachments } = body || {};
 
   if (status !== undefined && !STATUS.includes(status)) {
     return NextResponse.json({ error: "Status invalido" }, { status: 400, headers: H });
@@ -67,6 +68,10 @@ export async function PATCH(
   if (notes !== undefined) {
     updates.push(`notes = $${idx++}`);
     values.push(notes);
+  }
+  if (attachments !== undefined) {
+    updates.push(`attachments = $${idx++}`);
+    values.push(JSON.stringify(Array.isArray(attachments) ? attachments : []));
   }
   updates.push(`updated_at = NOW()`);
 
