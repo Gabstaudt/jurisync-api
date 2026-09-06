@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
     feesValue = null,
     feesPercentage = null,
     contingency = null,
+    parties: partyLinks,
   } = body || {};
 
   if (!title || typeof title !== "string") {
@@ -164,5 +165,32 @@ export async function POST(req: NextRequest) {
     ],
   );
 
-  return NextResponse.json(mapProcess(rows[0]), { status: 201, headers: H });
+  const created = rows[0];
+
+  if (Array.isArray(partyLinks) && partyLinks.length) {
+    const writes: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    for (const link of partyLinks) {
+      if (!link?.partyId) continue;
+      writes.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+      values.push(
+        created.id,
+        link.partyId,
+        session.user.ecosystemId,
+        link.side || null,
+        link.representsPartyId || null,
+      );
+    }
+    if (writes.length) {
+      await q(
+        `INSERT INTO process_parties (process_id, party_id, ecosystem_id, side, represents_party_id)
+         VALUES ${writes.join(", ")}
+         ON CONFLICT (process_id, party_id) DO NOTHING`,
+        values,
+      );
+    }
+  }
+
+  return NextResponse.json(mapProcess(created), { status: 201, headers: H });
 }
