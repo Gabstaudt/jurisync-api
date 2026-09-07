@@ -25,8 +25,14 @@ export async function GET(req: NextRequest) {
   }
   const ecosystemId = session.user.ecosystemId;
 
-  const [{ rows: contractsAgg }, { rows: paymentsAgg }, { rows: overdue }, { rows: upcoming }, { rows: monthly }] =
-    await Promise.all([
+  const [
+    { rows: contractsAgg },
+    { rows: paymentsAgg },
+    { rows: overdue },
+    { rows: upcoming },
+    { rows: monthly },
+    { rows: processesAgg },
+  ] = await Promise.all([
       q(
         `SELECT COALESCE(SUM(value), 0) AS total_contracted, COUNT(*) AS total_contracts
          FROM contracts WHERE ecosystem_id = $1 AND is_archived = FALSE`,
@@ -70,12 +76,24 @@ export async function GET(req: NextRequest) {
          ORDER BY 1 ASC`,
         [ecosystemId],
       ),
+      q(
+        `SELECT
+           COUNT(*) AS total_processes,
+           COALESCE(SUM(claim_value), 0) AS total_claim_value,
+           COALESCE(SUM(fees_value), 0) AS total_fees
+         FROM processes
+         WHERE ecosystem_id = $1 AND status != 'encerrado'`,
+        [ecosystemId],
+      ),
     ]);
 
   const totalPaid = Number(paymentsAgg[0]?.total_paid || 0);
   const totalPending = Number(paymentsAgg[0]?.total_pending || 0);
   const overdueAmount = overdue.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
   const upcomingAmount = upcoming.reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+  const totalProcesses = Number(processesAgg[0]?.total_processes || 0);
+  const totalClaimValue = Number(processesAgg[0]?.total_claim_value || 0);
+  const totalProcessFees = Number(processesAgg[0]?.total_fees || 0);
 
   return NextResponse.json(
     {
@@ -83,6 +101,10 @@ export async function GET(req: NextRequest) {
       totalContracts: Number(contractsAgg[0]?.total_contracts || 0),
       totalPaid,
       totalPending,
+      totalProcesses,
+      totalClaimValue,
+      totalProcessFees,
+      totalReceivable: totalPending + totalProcessFees,
       overdueAmount,
       overdueCount: overdue.length,
       upcomingAmount,
