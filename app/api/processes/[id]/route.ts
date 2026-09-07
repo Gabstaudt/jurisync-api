@@ -44,6 +44,7 @@ const mapProcess = (row: any) => ({
   notes: row.notes,
   actionGroup: row.action_group,
   phase: row.phase,
+  stage: row.stage,
   cnjNumber: row.cnj_number,
   protocolNumber: row.protocol_number,
   originProcess: row.origin_process,
@@ -91,6 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     notes,
     actionGroup,
     phase,
+    stage,
     cnjNumber,
     protocolNumber,
     originProcess,
@@ -144,6 +146,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (phase !== undefined) {
     updates.push(`phase = $${idx++}`);
     paramsList.push(phase);
+  }
+  if (stage !== undefined) {
+    updates.push(`stage = $${idx++}`);
+    paramsList.push(stage);
   }
   if (cnjNumber !== undefined) {
     updates.push(`cnj_number = $${idx++}`);

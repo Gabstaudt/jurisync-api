@@ -20,6 +20,7 @@ const mapDeadline = (r: any) => ({
   dueDate: r.due_date,
   status: r.status,
   notes: r.notes,
+  attachments: r.attachments || [],
   createdBy: r.created_by,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const dueDate = body?.dueDate;
   const notes = body?.notes || null;
   const status = body?.status || "pendente";
+  const attachments = Array.isArray(body?.attachments) ? body.attachments : [];
 
   if (!title) {
     return NextResponse.json({ error: "Titulo do prazo obrigatorio" }, { status: 400, headers: H });
@@ -78,10 +80,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { rows } = await q(
-    `INSERT INTO process_deadlines (process_id, ecosystem_id, title, due_date, status, notes, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `INSERT INTO process_deadlines (process_id, ecosystem_id, title, due_date, status, notes, attachments, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      RETURNING *`,
-    [id, session.user.ecosystemId, title, new Date(dueDate), status, notes, session.user.id],
+    [id, session.user.ecosystemId, title, new Date(dueDate), status, notes, JSON.stringify(attachments), session.user.id],
   );
 
   return NextResponse.json(mapDeadline(rows[0]), { status: 201, headers: H });

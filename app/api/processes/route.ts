@@ -44,6 +44,7 @@ const mapProcess = (row: any) => ({
   notes: row.notes,
   actionGroup: row.action_group,
   phase: row.phase,
+  stage: row.stage,
   cnjNumber: row.cnj_number,
   protocolNumber: row.protocol_number,
   originProcess: row.origin_process,
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
     notes = null,
     actionGroup = null,
     phase = null,
+    stage = null,
     cnjNumber = null,
     protocolNumber = null,
     originProcess = null,
@@ -130,6 +132,7 @@ export async function POST(req: NextRequest) {
       notes,
       action_group,
       phase,
+      stage,
       cnj_number,
       protocol_number,
       origin_process,
@@ -139,7 +142,7 @@ export async function POST(req: NextRequest) {
       fees_percentage,
       contingency
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
     RETURNING *
     `,
     [
@@ -154,6 +157,7 @@ export async function POST(req: NextRequest) {
       notes,
       actionGroup,
       phase,
+      stage,
       cnjNumber,
       protocolNumber,
       originProcess,

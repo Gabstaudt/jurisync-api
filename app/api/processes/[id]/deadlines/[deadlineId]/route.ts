@@ -20,6 +20,7 @@ const mapDeadline = (r: any) => ({
   dueDate: r.due_date,
   status: r.status,
   notes: r.notes,
+  attachments: r.attachments || [],
   createdBy: r.created_by,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -37,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const body = await req.json().catch(() => ({}));
-  const { title, dueDate, status, notes } = body || {};
+  const { title, dueDate, status, notes, attachments } = body || {};
 
   if (status !== undefined && !STATUS.includes(status)) {
     return NextResponse.json({ error: "Status invalido" }, { status: 400, headers: H });
@@ -62,6 +63,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (notes !== undefined) {
     updates.push(`notes = $${idx++}`);
     values.push(notes);
+  }
+  if (attachments !== undefined) {
+    updates.push(`attachments = $${idx++}`);
+    values.push(JSON.stringify(Array.isArray(attachments) ? attachments : []));
   }
   updates.push(`updated_at = NOW()`);
 
