@@ -30,11 +30,12 @@ export async function PATCH(req: NextRequest, context: any) {
     const values: any[] = [];
     const map: Record<string, string> = {
       name: "name",
-      contact: "contact",
+      role: "role",
       email: "email",
       phone: "phone",
+      document: "document",
       address: "address",
-      notes: "notes",
+      companyId: "company_id",
     };
     Object.entries(map).forEach(([k, col]) => {
       if (body[k] !== undefined) {
@@ -56,15 +57,22 @@ export async function PATCH(req: NextRequest, context: any) {
     if (!p) {
       return NextResponse.json({ error: "Parte nao encontrada" }, { status: 404, headers: H });
     }
+    let companyName: string | null = null;
+    if (p.company_id) {
+      const { rows: c } = await q("SELECT name FROM companies WHERE id = $1", [p.company_id]);
+      companyName = c[0]?.name || null;
+    }
     return NextResponse.json(
       {
         id: p.id,
         name: p.name,
-        contact: p.contact,
+        role: p.role,
         email: p.email,
         phone: p.phone,
+        document: p.document,
         address: p.address,
-        notes: p.notes,
+        companyId: p.company_id,
+        companyName,
         ecosystemId: p.ecosystem_id,
         createdAt: p.created_at,
         updatedAt: p.updated_at,

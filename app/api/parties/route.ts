@@ -36,6 +36,8 @@ export async function GET(req: Request) {
         role: p.role,
         email: p.email,
         phone: p.phone,
+        document: p.document,
+        address: p.address,
         companyId: p.company_id,
         companyName: p.company_name,
         ecosystemId: p.ecosystem_id,
@@ -63,6 +65,8 @@ export async function POST(req: Request) {
     }
     const email = (body.email || "").trim();
     const phone = (body.phone || "").trim();
+    const document = (body.document || "").trim();
+    const address = (body.address || "").trim();
     const companyId = body.companyId || null;
 
     if (companyId) {
@@ -76,8 +80,8 @@ export async function POST(req: Request) {
     }
 
     const { rows } = await q(
-      `INSERT INTO parties (ecosystem_id, company_id, name, role, email, phone, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO parties (ecosystem_id, company_id, name, role, email, phone, document, address, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         session.user.ecosystemId,
@@ -86,6 +90,8 @@ export async function POST(req: Request) {
         role,
         email || null,
         phone || null,
+        document || null,
+        address || null,
         session.user.id,
       ],
     );
@@ -102,6 +108,8 @@ export async function POST(req: Request) {
         role: p.role,
         email: p.email,
         phone: p.phone,
+        document: p.document,
+        address: p.address,
         companyId: p.company_id,
         companyName,
         ecosystemId: p.ecosystem_id,
