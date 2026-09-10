@@ -52,5 +52,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ configured: true, error: result.error }, { status: 502, headers: H });
   }
 
-  return NextResponse.json({ configured: true, movimentos: result.movimentos }, { headers: H });
+  return NextResponse.json(
+    { configured: true, movimentos: result.movimentos, debug: result.debug },
+    { headers: H },
+  );
 }

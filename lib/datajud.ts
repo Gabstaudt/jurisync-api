@@ -101,7 +101,7 @@ export function isDataJudConfigured(): boolean {
 export async function fetchMovimentacoes(cnjNumber: string): Promise<
   | { configured: false }
   | { configured: true; error: string }
-  | { configured: true; movimentos: any[] }
+  | { configured: true; movimentos: any[]; debug: { alias: string; numeroProcesso: string } }
 > {
   if (!isDataJudConfigured()) {
     return { configured: false };
@@ -127,7 +127,7 @@ export async function fetchMovimentacoes(cnjNumber: string): Promise<
     body: JSON.stringify({
       query: { match: { numeroProcesso: clean } },
     }),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!res.ok) {
@@ -137,5 +137,9 @@ export async function fetchMovimentacoes(cnjNumber: string): Promise<
 
   const data = await res.json();
   const hit = data?.hits?.hits?.[0]?._source;
-  return { configured: true, movimentos: hit?.movimentos || [] };
+  return {
+    configured: true,
+    movimentos: hit?.movimentos || [],
+    debug: { alias, numeroProcesso: clean },
+  };
 }
