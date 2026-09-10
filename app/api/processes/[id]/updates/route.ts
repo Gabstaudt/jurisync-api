@@ -15,6 +15,7 @@ const mapUpdate = (r: any) => ({
   id: r.id,
   processId: r.process_id,
   content: r.content,
+  attachments: r.attachments || [],
   createdBy: r.created_by,
   createdByName: r.created_by_name,
   createdAt: r.created_at,
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     [id, session.user.ecosystemId, content, session.user.id],
   );
 
-  return NextResponse.json(mapUpdate({ ...rows[0], created_by_name: session.user.name }), {
+  return NextResponse.json(mapUpdate({ ...rows[0], created_by_name: session.user.name, attachments: [] }), {
     status: 201,
     headers: H,
   });
